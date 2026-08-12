@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
+
+const GA_MEASUREMENT_ID = "G-FSD6QCXQDR";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -69,6 +72,24 @@ export default function RootLayout({
         {children}
         <Analytics />
         <SpeedInsights />
+
+        {/* Google Analytics. Client-side route changes are picked up by GA4's
+            enhanced measurement (history-event trigger), so no manual
+            page_view call is needed on navigation. The googletagmanager /
+            google-analytics hosts are allowlisted in next.config.ts's CSP —
+            without that, these requests are blocked outright. */}
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GA_MEASUREMENT_ID}');
+          `}
+        </Script>
       </body>
     </html>
   );
