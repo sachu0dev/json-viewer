@@ -1,4 +1,5 @@
-import { ViewerApp } from "@/components/ViewerApp";
+import { ToolPage } from "@/components/ToolPage";
+import { SCHEMA_AUTHOR } from "@/lib/site";
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -7,19 +8,23 @@ const structuredData = {
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Any (runs in browser)",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  author: SCHEMA_AUTHOR,
   description:
-    "A fast, keyboard-first JSON viewer that runs entirely in the browser: paste and inspect JSON, compare two documents, or open large files without freezing the tab.",
+    "A free online JSON viewer, formatter, and parser: paste JSON to instantly format, validate, and explore it, compare two documents, or open large files without freezing the tab.",
 };
 
 export default function Home() {
   return (
-    <div className="h-dvh w-full">
+    <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <h1 className="sr-only">JSON Viewer — Paste, Diff, and Inspect JSON in Your Browser</h1>
-      <ViewerApp />
-    </div>
+      <ToolPage heading="Free JSON Viewer, Formatter & Parser">
+        Paste JSON to instantly format, validate, and explore it — with syntax highlighting,
+        search, and a collapsible tree view. Compare two JSON documents or open large multi-MB
+        files without freezing your browser. Nothing you paste ever leaves your device.
+      </ToolPage>
+    </>
   );
 }

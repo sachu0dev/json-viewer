@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ToolPage } from "@/components/ToolPage";
+import { SCHEMA_AUTHOR } from "@/lib/site";
 
 const TITLE = "View Large JSON Files Without Crashing Your Browser";
 const DESCRIPTION =
@@ -20,6 +21,7 @@ const structuredData = {
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Any (runs in browser)",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  author: SCHEMA_AUTHOR,
   description: DESCRIPTION,
 };
 

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { ToolPage } from "@/components/ToolPage";
+import { SCHEMA_AUTHOR } from "@/lib/site";
 
-const TITLE = "JSON Diff Tool — Compare Two JSON Files Online";
+const TITLE = "JSON Diff Checker — Compare Two JSON Files Online";
 const DESCRIPTION =
-  "Compare two JSON documents and see exactly what was added, removed, or changed — a real structural diff, not a text diff. Runs entirely in your browser, nothing is uploaded.";
+  "Compare two JSON documents and see exactly what was added, removed, or changed — a real structural diff, not a text diff. Free JSON diff checker, runs entirely in your browser, nothing is uploaded.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -20,6 +21,7 @@ const structuredData = {
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Any (runs in browser)",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  author: SCHEMA_AUTHOR,
   description: DESCRIPTION,
 };
 

@@ -18,6 +18,7 @@ import {
   applyThemeVariables,
   type Theme,
 } from "../lib/themes";
+import { applyFavicon } from "../lib/favicon";
 
 interface ThemeContextValue {
   theme: Theme;
@@ -32,7 +33,9 @@ export function ThemeProvider({ children }: { children: ReactNode }): ReactEleme
   const [themeId, setThemeIdState] = useState<string>(() => getSavedThemeId());
 
   useEffect(() => {
-    applyThemeVariables(getThemeById(themeId));
+    const theme = getThemeById(themeId);
+    applyThemeVariables(theme);
+    applyFavicon(theme);
   }, [themeId]);
 
   function setThemeId(id: string) {

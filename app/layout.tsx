@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,23 +22,35 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "JSON Viewer — Paste, Diff, and Inspect JSON in Your Browser",
+    default: "JSON Viewer, Formatter & Parser — Free Online JSON Tool",
     template: "%s | JSON Viewer",
   },
   description:
-    "A fast, keyboard-first JSON viewer that runs entirely in your browser. Paste JSON to inspect it, compare two documents, or open large files without freezing the tab. Nothing you paste ever leaves your browser.",
+    "A free online JSON viewer, formatter, and parser. Paste JSON to instantly format, validate, and explore it with syntax highlighting, compare two documents, or open large files without freezing the tab. Nothing you paste ever leaves your browser.",
+  keywords: [
+    "json viewer",
+    "json formatter",
+    "json parser",
+    "json validator",
+    "json beautifier",
+    "online json editor",
+    "json diff",
+    "json compare",
+  ],
+  authors: [{ name: "Sushil Kumar", url: "https://devure.in" }],
+  creator: "Sushil Kumar",
   openGraph: {
     type: "website",
     siteName: "JSON Viewer",
-    title: "JSON Viewer — Paste, Diff, and Inspect JSON in Your Browser",
+    title: "JSON Viewer, Formatter & Parser — Free Online JSON Tool",
     description:
-      "A fast, keyboard-first JSON viewer that runs entirely in your browser. Nothing you paste ever leaves your browser.",
+      "Paste JSON to instantly format, validate, and explore it. Compare documents or open large files — nothing you paste ever leaves your browser.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "JSON Viewer — Paste, Diff, and Inspect JSON in Your Browser",
+    title: "JSON Viewer, Formatter & Parser — Free Online JSON Tool",
     description:
-      "A fast, keyboard-first JSON viewer that runs entirely in your browser. Nothing you paste ever leaves your browser.",
+      "Paste JSON to instantly format, validate, and explore it. Compare documents or open large files — nothing you paste ever leaves your browser.",
   },
   alternates: { canonical: "/" },
 };
@@ -51,7 +65,11 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Analytics />
+        <SpeedInsights />
+      </body>
     </html>
   );
 }

@@ -12,8 +12,7 @@ import { useJsonDocument } from "@/hooks/useJsonDocument";
 import { useRecentFiles } from "@/hooks/useRecentFiles";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { decodeShareFragment, encodeShareFragment } from "@/lib/share";
-
-const SUPPORT_URL = "#";
+import { PORTFOLIO_URL, GITHUB_URL, TWITTER_URL, LINKEDIN_URL } from "@/lib/site";
 
 function tryAutoFormat(text: string): string {
   try {
@@ -218,9 +217,14 @@ function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolea
       setThemeId(targetThemeId);
       const selected = themes.find((t) => t.id === targetThemeId);
       if (selected) setToast(`Theme changed to ${selected.name}`);
-    } else if (commandId === "support") {
-      if (SUPPORT_URL === "#") setToast("Add SUPPORT_URL in ViewerApp.tsx to enable this link");
-      else window.open(SUPPORT_URL, "_blank", "noopener,noreferrer");
+    } else if (commandId === "portfolio") {
+      window.open(PORTFOLIO_URL, "_blank", "noopener,noreferrer");
+    } else if (commandId === "github") {
+      window.open(GITHUB_URL, "_blank", "noopener,noreferrer");
+    } else if (commandId === "twitter") {
+      window.open(TWITTER_URL, "_blank", "noopener,noreferrer");
+    } else if (commandId === "linkedin") {
+      window.open(LINKEDIN_URL, "_blank", "noopener,noreferrer");
     }
   }
 
@@ -247,10 +251,12 @@ function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolea
       });
     }
 
-    list.push({
-      id: "support",
-      label: "Support this project ♥",
-    });
+    list.push(
+      { id: "portfolio", label: "Portfolio — devure.in ↗" },
+      { id: "github", label: "GitHub — sachu0dev ↗" },
+      { id: "twitter", label: "Twitter/X — sachu0dev ↗" },
+      { id: "linkedin", label: "LinkedIn — sachu0dev ↗" },
+    );
 
     return list;
   }, [rows, themes, theme.id, viewLayout]);
@@ -369,6 +375,27 @@ function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolea
               </button>
             </>
           )}
+
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="GitHub — sachu0dev"
+            className="px-1.5 py-1 text-xs transition-colors hover:opacity-80"
+            style={{ color: theme.colors.muted }}
+          >
+            GitHub
+          </a>
+          <a
+            href={PORTFOLIO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Portfolio — devure.in"
+            className="px-1.5 py-1 text-xs transition-colors hover:opacity-80"
+            style={{ color: theme.colors.muted }}
+          >
+            devure.in
+          </a>
 
           <button
             onClick={() => setPaletteOpen(true)}
