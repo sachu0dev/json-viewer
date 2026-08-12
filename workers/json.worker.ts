@@ -2,11 +2,16 @@ import {
   ancestorsOf,
   buildFlatRows,
   buildSideBySideDiffRows,
+  buildSearchMatcher,
+  DEFAULT_FORMAT_OPTIONS,
   describeParseError,
   diffDocuments,
   searchDocument,
+  stringifyWithOptions,
+  type FormatOptions,
   type JsonValue,
   type ParseError,
+  type SearchOptions,
 } from "../lib/json-document";
 import { getDynamicExpandPaths, parseTolerantJSON, type ParseMode } from "../lib/json-parser";
 
@@ -20,11 +25,15 @@ const expanded = new Set<string>(["$"]);
 export type WorkerRequest =
   | { type: "parse"; text: string }
   | { type: "toggle"; path: string }
-  | { type: "search"; query: string }
+  | { type: "search"; query: string; opts?: SearchOptions }
   | { type: "reveal"; path: string }
   | { type: "compare"; text: string }
   | { type: "clear-compare" }
-  | { type: "stringify"; mode: "pretty" | "compact" };
+  | { type: "expand-all" }
+  | { type: "collapse-all" }
+  | { type: "stringify"; mode: "pretty" | "compact"; formatOptions?: FormatOptions }
+  | { type: "jsonpath"; expression: string }
+  | { type: "parse-jsonl"; text: string };
 
 export type WorkerResponse =
   | {
@@ -35,14 +44,16 @@ export type WorkerResponse =
       jsEvalStatus: "success" | "fails";
     }
   | { type: "error"; error: ParseError; jsEvalStatus: "success" | "fails" }
-  | { type: "search-results"; paths: string[] }
+  | { type: "search-results"; paths: string[]; isInvalidRegex: boolean }
   | {
       type: "diff";
       entries: ReturnType<typeof diffDocuments>;
       sideBySideRows: ReturnType<typeof buildSideBySideDiffRows>;
     }
   | { type: "compare-error"; error: ParseError }
-  | { type: "stringified"; mode: "pretty" | "compact"; text: string };
+  | { type: "stringified"; mode: "pretty" | "compact"; text: string }
+  | { type: "jsonpath-results"; result: import("../lib/jsonpath").JsonPathQueryResult }
+  | { type: "jsonl-parsed"; summary: import("../lib/jsonl-parser").JsonlSummary };
 
 function respond(message: WorkerResponse) {
   (self as unknown as Worker).postMessage(message);
@@ -102,10 +113,17 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
 
   if (message.type === "search") {
     if (doc === null || message.query.trim() === "") {
-      respond({ type: "search-results", paths: [] });
+      respond({ type: "search-results", paths: [], isInvalidRegex: false });
       return;
     }
-    respond({ type: "search-results", paths: searchDocument(doc, message.query) });
+    const opts: SearchOptions = message.opts ?? {};
+    // Check for invalid regex before running the full search
+    const isInvalidRegex = Boolean(opts.isRegex && buildSearchMatcher(message.query, opts) === null);
+    respond({
+      type: "search-results",
+      paths: searchDocument(doc, message.query, opts),
+      isInvalidRegex,
+    });
     return;
   }
 
@@ -144,9 +162,61 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     return;
   }
 
+  if (message.type === "expand-all") {
+    if (doc === null) return;
+    function collectAllPaths(value: JsonValue, path: string) {
+      if (value === null || typeof value !== "object") return;
+      expanded.add(path);
+      if (Array.isArray(value)) {
+        value.forEach((v, i) => collectAllPaths(v, `${path}[${i}]`));
+      } else {
+        for (const [k, v] of Object.entries(value as Record<string, JsonValue>)) {
+          collectAllPaths(v, path === "$" ? `$.${k}` : `${path}.${k}`);
+        }
+      }
+    }
+    collectAllPaths(doc, "$");
+    respondWithRows();
+    return;
+  }
+
+  if (message.type === "collapse-all") {
+    expanded.clear();
+    expanded.add("$");
+    respondWithRows();
+    return;
+  }
+
   if (message.type === "stringify") {
     if (doc === null) return;
-    const text = message.mode === "pretty" ? JSON.stringify(doc, null, 2) : JSON.stringify(doc);
+    let text: string;
+    if (message.formatOptions) {
+      text = stringifyWithOptions(doc, message.formatOptions);
+    } else {
+      // Legacy pretty/compact fallback
+      const opts: FormatOptions = message.mode === "compact"
+        ? { ...DEFAULT_FORMAT_OPTIONS, indent: 0 }
+        : DEFAULT_FORMAT_OPTIONS;
+      text = stringifyWithOptions(doc, opts);
+    }
     respond({ type: "stringified", mode: message.mode, text });
+  }
+
+  if (message.type === "jsonpath") {
+    if (doc === null) {
+      respond({ type: "jsonpath-results", result: { results: [], executionMs: 0, error: "No document loaded" } });
+      return;
+    }
+    const { executeJsonPath } = require("../lib/jsonpath");
+    const result = executeJsonPath(doc, message.expression);
+    respond({ type: "jsonpath-results", result });
+    return;
+  }
+
+  if (message.type === "parse-jsonl") {
+    const { parseJsonl } = require("../lib/jsonl-parser");
+    const summary = parseJsonl(message.text);
+    respond({ type: "jsonl-parsed", summary });
+    return;
   }
 };

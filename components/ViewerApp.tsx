@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CommandPalette, type Command } from "@/components/CommandPalette";
 import { EmptyState } from "@/components/EmptyState";
+import { FormatOptionsPopover, loadFormatOptions } from "@/components/FormatOptionsPopover";
 import { JsonEditorArea } from "@/components/JsonEditorArea";
 import { JsonTree } from "@/components/JsonTree";
-import { SearchBar } from "@/components/SearchBar";
+import { SearchBar, type SearchBarHandle } from "@/components/SearchBar";
+import { ShortcutsModal } from "@/components/ShortcutsModal";
 import { SideBySideDiff } from "@/components/SideBySideDiff";
 import { useJsonDocument } from "@/hooks/useJsonDocument";
 import { useRecentFiles } from "@/hooks/useRecentFiles";
@@ -14,6 +16,13 @@ import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { decodeLegacyGzipFragment, decodeShareFragment, encodeShareFragment } from "@/lib/share";
 import { track, type LoadSource } from "@/lib/analytics";
 import { PORTFOLIO_URL, GITHUB_URL, TWITTER_URL, LINKEDIN_URL } from "@/lib/site";
+import { DEFAULT_FORMAT_OPTIONS, type FormatOptions } from "@/lib/json-document";
+import { SettingsModal } from "@/components/SettingsModal";
+import { loadSettings, type AppSettings } from "@/lib/settings";
+import { RepairModal } from "@/components/RepairModal";
+import { repairJson, type RepairResult } from "@/lib/json-repair";
+import { isJsonlContent, parseJsonl } from "@/lib/jsonl-parser";
+import { JsonlViewer } from "@/components/JsonlViewer";
 
 function tryAutoFormat(text: string): string {
   try {
@@ -44,7 +53,11 @@ export function ViewerAppContent({
     matches,
     activeMatchIndex,
     revealTarget,
+    isInvalidRegex,
     goToMatch,
+    revealPath,
+    expandAll,
+    collapseAll,
     sideBySideRows,
     compareError,
     compare,
@@ -53,11 +66,37 @@ export function ViewerAppContent({
   } = useJsonDocument();
   const { recent, record, clear: clearRecentFiles } = useRecentFiles();
   const { theme, setThemeId, themes } = useTheme();
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<SearchBarHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [rawText, setRawText] = useState<string>("");
-  const [viewLayout, setViewLayout] = useState<"split" | "tree">("split");
+  const [viewLayout, setViewLayout] = useState<"split" | "tree" | "preview">("split");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [formatOptions, setFormatOptions] = useState<FormatOptions>(() =>
+    typeof window !== "undefined" ? loadFormatOptions() : DEFAULT_FORMAT_OPTIONS
+  );
+  const [formatPopoverOpen, setFormatPopoverOpen] = useState(false);
+
+  // Minifier stats — null = bar hidden, object = show stats
+  type MinifyStats = { originalBytes: number; minifiedBytes: number; minifiedText: string };
+  const [minifyStats, setMinifyStats] = useState<MinifyStats | null>(null);
+
+  const [splitRatio, setSplitRatio] = useState<number>(() => {
+    if (typeof window === "undefined") return 50;
+    try { return Number(localStorage.getItem("devure-json:split-ratio")) || 50; } catch { return 50; }
+  });
+  const isDraggingRef = useRef(false);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [appSettings, setAppSettings] = useState<AppSettings>(() => loadSettings());
+  const [repairModalOpen, setRepairModalOpen] = useState(false);
+  const [repairResult, setRepairResult] = useState<RepairResult | null>(null);
+  const [isJsonlMode, setIsJsonlMode] = useState(false);
+
+  const isJsonlDetected = useMemo(() => {
+    if (!rawText.trim()) return false;
+    return isJsonlContent(rawText);
+  }, [rawText]);
 
   const [isComparing, setIsComparing] = useState(false);
   const isComparingRef = useRef(isComparing);
@@ -157,6 +196,19 @@ export function ViewerAppContent({
     },
     [loadText],
   );
+
+  function handleFileOpen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result;
+      if (typeof text === "string") openText(text, "paste");
+    };
+    reader.readAsText(file);
+    // Reset so same file can be opened again
+    e.target.value = "";
+  }
 
   const handleIncomingText = useCallback(
     (text: string, source: LoadSource = "paste") => {
@@ -262,12 +314,58 @@ export function ViewerAppContent({
 
   function handleFormatText() {
     track("feature_used", { feature: "format" });
-    stringify("pretty").then((formatted) => {
+    setFormatPopoverOpen(false);
+    stringify("pretty", formatOptions).then((formatted) => {
       setRawText(formatted);
       currentTextRef.current = formatted;
       loadText(formatted);
-      setToast("Formatted JSON with clean indentation");
+      setToast("Formatted JSON");
     });
+  }
+
+  function handleDownload() {
+    const text = currentTextRef.current;
+    if (!text) return;
+    track("feature_used", { feature: "download" });
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "document.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    setToast("JSON downloaded");
+  }
+
+  // Replace the text at the currently active match with the replacement string.
+  // Operates on rawText so it works even when the tree doesn't expose the raw value.
+  function handleReplace(replaceWith: string) {
+    if (!rows || error) return;
+    const text = currentTextRef.current;
+    if (!text || !revealTarget) return;
+    // Find the path segment at the end of revealTarget and use it as the search key in raw text
+    // Simpler: just replace the first occurrence of the current searchQuery in the raw text
+    const query = searchQuery;
+    if (!query) return;
+    const idx = text.indexOf(query);
+    if (idx === -1) return;
+    const newText = text.slice(0, idx) + replaceWith + text.slice(idx + query.length);
+    currentTextRef.current = newText;
+    setRawText(newText);
+    loadText(newText);
+    setToast("Replaced 1 match");
+  }
+
+  function handleReplaceAll(find: string, replaceWith: string) {
+    if (!rows || error) return;
+    const text = currentTextRef.current;
+    if (!text || !find) return;
+    const newText = text.split(find).join(replaceWith);
+    if (newText === text) { setToast("No matches to replace"); return; }
+    currentTextRef.current = newText;
+    setRawText(newText);
+    loadText(newText);
+    setToast(`Replaced all occurrences of "${find}"`);
   }
 
   const [toast, setToast] = useState<string | null>(null);
@@ -290,8 +388,121 @@ export function ViewerAppContent({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // App-wide keyboard shortcuts beyond Cmd+K and '/'
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const meta = e.metaKey || e.ctrlKey;
+      const inInput = document.activeElement?.tagName === "TEXTAREA" || document.activeElement?.tagName === "INPUT";
+
+      // Ctrl+S — download
+      if (meta && !e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (rows) handleDownload();
+        return;
+      }
+
+      // Ctrl+F — focus search (same as '/')
+      if (meta && !e.shiftKey && e.key.toLowerCase() === "f" && !inInput) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // Ctrl+Shift+F — format
+      if (meta && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        if (rows) handleFormatText();
+        return;
+      }
+
+      // Ctrl+Shift+M — minify
+      if (meta && e.shiftKey && e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        if (rows) handleMinify();
+        return;
+      }
+
+      // Ctrl+D — compare/diff
+      if (meta && !e.shiftKey && e.key.toLowerCase() === "d" && !inInput) {
+        e.preventDefault();
+        if (rows && !isComparing) startCompare();
+        return;
+      }
+
+      // Ctrl+O — open file
+      if (meta && !e.shiftKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        fileInputRef.current?.click();
+        return;
+      }
+
+      // Ctrl+Alt+F — open find & replace
+      if (meta && e.altKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        searchInputRef.current?.toggleReplace();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // ? — Keyboard shortcuts cheat sheet
+      if (e.key === "?" && !inInput) {
+        e.preventDefault();
+        setShortcutsModalOpen((open) => !open);
+        return;
+      }
+
+      // Escape — clear search / exit compare / close any open panel
+      if (e.key === "Escape" && !paletteOpen && !shortcutsModalOpen) {
+        if (isComparing) {
+          exitCompare();
+          return;
+        }
+        if (searchQuery) {
+          setSearchQuery("");
+          search("");
+          searchInputRef.current?.blur();
+          return;
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, isComparing, paletteOpen, searchQuery]);
+
+  async function handleMinify() {
+    if (!rows) return;
+    track("feature_used", { feature: "minify" });
+    const originalBytes = new TextEncoder().encode(rawText).length;
+    const text = await stringify("compact");
+    const minifiedBytes = new TextEncoder().encode(text).length;
+    setMinifyStats({ originalBytes, minifiedBytes, minifiedText: text });
+  }
+
+  function handleRepair() {
+    track("feature_used", { feature: "repair" });
+    const res = repairJson(rawText);
+    setRepairResult(res);
+    setRepairModalOpen(true);
+  }
+
   function handleSelectCommand(commandId: string) {
-    if (commandId === "copy-formatted") {
+    if (commandId === "minify-json") {
+      handleMinify();
+    } else if (commandId === "repair-json") {
+      handleRepair();
+    } else if (commandId === "toggle-jsonl") {
+      track("feature_used", { feature: "jsonl_mode" });
+      setIsJsonlMode((m) => !m);
+    } else if (commandId === "open-settings") {
+      setSettingsOpen(true);
+    } else if (commandId === "open-jsonpath") {
+      // Encode current JSON into URL hash and navigate to the JSONPath page
+      stringify("pretty").then((text) => {
+        const fragment = encodeShareFragment(text);
+        window.open(`/jsonpath#${fragment}`, "_blank", "noopener");
+      });
+    } else if (commandId === "copy-formatted") {
       track("feature_used", { feature: "copy_formatted" });
       stringify("pretty")
         .then((text) => navigator.clipboard.writeText(text))
@@ -303,13 +514,23 @@ export function ViewerAppContent({
         .then(() => setToast("Copied minified JSON"));
     } else if (commandId === "format-editor") {
       handleFormatText();
+    } else if (commandId === "download") {
+      handleDownload();
     } else if (commandId === "share") {
       handleShare();
     } else if (commandId === "compare") {
       startCompare();
     } else if (commandId === "toggle-layout") {
       track("feature_used", { feature: "view_toggle" });
-      setViewLayout((l) => (l === "split" ? "tree" : "split"));
+      setViewLayout((l) => l === "split" ? "tree" : l === "tree" ? "preview" : "split");
+    } else if (commandId === "expand-all") {
+      expandAll();
+    } else if (commandId === "collapse-all") {
+      collapseAll();
+    } else if (commandId === "open-file") {
+      fileInputRef.current?.click();
+    } else if (commandId === "shortcuts-sheet") {
+      setShortcutsModalOpen(true);
     } else if (commandId === "clear-recent") {
       clearRecentFiles();
     } else if (commandId.startsWith("theme-")) {
@@ -329,21 +550,39 @@ export function ViewerAppContent({
     }
   }
 
+  const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+  const mod = isMac ? "⌘" : "Ctrl";
+
   const commands = useMemo<Command[]>(() => {
     const list: Command[] = [];
 
     if (rows) {
       list.push(
-        { id: "format-editor", label: "Format JSON" },
+        { id: "format-editor", label: "Format JSON", shortcut: `${mod}⇧F` },
+        { id: "minify-json", label: "Minify JSON", shortcut: `${mod}⇧M` },
         { id: "copy-formatted", label: "Copy formatted JSON" },
         { id: "copy-minified", label: "Copy minified JSON" },
+        { id: "download", label: "Download JSON", shortcut: `${mod}S` },
         { id: "share", label: "Share (copy link, no server)" },
-        { id: "compare", label: "Compare side-by-side with another document" },
-        { id: "toggle-layout", label: `Toggle view layout (Current: ${viewLayout})` },
+        { id: "open-jsonpath", label: "Query with JSONPath…" },
+        { id: "toggle-jsonl", label: isJsonlMode ? "Exit JSONL mode" : "Switch to JSONL viewer" },
+        { id: "compare", label: "Compare side-by-side with another document", shortcut: `${mod}D` },
+        { id: "expand-all", label: "Expand all nodes" },
+        { id: "collapse-all", label: "Collapse all nodes" },
+        { id: "toggle-layout", label: `Toggle view layout (Current: ${viewLayout === "split" ? "Split" : viewLayout === "tree" ? "Tree" : "Preview"})` },
       );
     }
 
-    list.push({ id: "clear-recent", label: "Clear recent files" });
+    if (stringParseError || error) {
+      list.push({ id: "repair-json", label: "Repair JSON (detect, preview diff & fix errors)" });
+    }
+
+    list.push(
+      { id: "shortcuts-sheet", label: "Keyboard Shortcuts Cheat Sheet", shortcut: "?" },
+      { id: "open-settings", label: "Open settings", shortcut: `${mod},` },
+      { id: "open-file", label: "Open file…", shortcut: `${mod}O` },
+      { id: "clear-recent", label: "Clear recent files" },
+    );
 
     for (const t of themes) {
       list.push({
@@ -360,7 +599,7 @@ export function ViewerAppContent({
     );
 
     return list;
-  }, [rows, themes, theme.id, viewLayout]);
+  }, [rows, themes, theme.id, viewLayout, mod]);
 
   return (
     <div
@@ -408,7 +647,7 @@ export function ViewerAppContent({
                   color: theme.colors.fg,
                 }}
               >
-                Split View
+                Split
               </button>
               <button
                 onClick={() => {
@@ -419,9 +658,24 @@ export function ViewerAppContent({
                 style={{
                   backgroundColor: viewLayout === "tree" ? theme.colors.active : "transparent",
                   color: theme.colors.fg,
+                  borderLeft: `1px solid ${theme.colors.border}`,
                 }}
               >
-                Tree View
+                Tree
+              </button>
+              <button
+                onClick={() => {
+                  track("feature_used", { feature: "view_toggle" });
+                  setViewLayout("preview");
+                }}
+                className={`px-2.5 py-1 text-xs font-mono transition-colors ${viewLayout === "preview" ? "font-bold" : ""}`}
+                style={{
+                  backgroundColor: viewLayout === "preview" ? theme.colors.active : "transparent",
+                  color: theme.colors.fg,
+                  borderLeft: `1px solid ${theme.colors.border}`,
+                }}
+              >
+                Preview
               </button>
             </div>
           )}
@@ -429,18 +683,77 @@ export function ViewerAppContent({
 
         <div className="flex items-center gap-2">
           {rows && !isComparing && (
-            <button
-              onClick={handleFormatText}
-              title="Auto-format raw JSON in editor"
-              className="px-2.5 py-1 text-xs rounded font-medium transition-colors"
-              style={{
-                backgroundColor: theme.colors.hover,
-                color: theme.colors.fg,
-              }}
-            >
-              Format
-            </button>
+            <div className="flex items-center gap-1.5">
+              {/* Format button group */}
+              <div className="relative flex items-stretch rounded overflow-hidden border" style={{ borderColor: theme.colors.border }}>
+                <button
+                  onClick={handleFormatText}
+                  title="Format JSON (Ctrl+Shift+F)"
+                  className="px-2.5 py-1 text-xs font-medium transition-colors"
+                  style={{
+                    backgroundColor: theme.colors.hover,
+                    color: theme.colors.fg,
+                  }}
+                >
+                  Format
+                </button>
+                <button
+                  onClick={() => setFormatPopoverOpen((o) => !o)}
+                  title="Format options"
+                  className="px-1.5 py-1 text-xs transition-colors"
+                  style={{
+                    backgroundColor: theme.colors.hover,
+                    color: theme.colors.muted,
+                    borderLeft: `1px solid ${theme.colors.border}`,
+                  }}
+                  aria-label="Open format options"
+                >
+                  ▾
+                </button>
+                {formatPopoverOpen && (
+                  <FormatOptionsPopover
+                    options={formatOptions}
+                    onChange={(opts) => setFormatOptions(opts)}
+                    onClose={() => setFormatPopoverOpen(false)}
+                  />
+                )}
+              </div>
+
+              {/* Minify button */}
+              <button
+                onClick={handleMinify}
+                title="Minify JSON (Ctrl+Shift+M)"
+                className="rounded px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80"
+                style={{
+                  backgroundColor: theme.colors.hover,
+                  color: theme.colors.fg,
+                  border: `1px solid ${theme.colors.border}`,
+                }}
+              >
+                Minify
+              </button>
+            </div>
           )}
+
+          {/* Hidden file input for Open File */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,.jsonc,.txt,text/plain,application/json"
+            className="hidden"
+            onChange={handleFileOpen}
+            aria-label="Open JSON file"
+          />
+
+          {/* Open File button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title="Open file (Ctrl+O)"
+            className="px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80"
+            style={{ color: theme.colors.muted }}
+          >
+            Open
+          </button>
 
           <select
             value={theme.id}
@@ -481,8 +794,44 @@ export function ViewerAppContent({
               >
                 Compare…
               </button>
+              <button
+                onClick={() => {
+                  stringify("pretty").then((text) => {
+                    const fragment = encodeShareFragment(text);
+                    window.open(`/jsonpath#${fragment}`, "_blank", "noopener");
+                  });
+                }}
+                className="px-2.5 py-1 text-xs transition-colors hover:opacity-80"
+                style={{ color: theme.colors.muted }}
+                title="Open current JSON in the JSONPath playground"
+              >
+                JSONPath…
+              </button>
             </>
           )}
+
+          <button
+            onClick={() => setShortcutsModalOpen(true)}
+            title="Keyboard shortcuts cheat sheet (?)"
+            className="rounded px-2.5 py-1 font-mono text-xs font-semibold transition-colors hover:opacity-80"
+            style={{
+              backgroundColor: theme.colors.hover,
+              color: theme.colors.fg,
+            }}
+          >
+            ?
+          </button>
+
+          {/* Settings button */}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            title="Settings"
+            className="rounded px-2 py-1 text-sm transition-colors hover:opacity-80"
+            style={{ color: theme.colors.muted }}
+            aria-label="Open settings"
+          >
+            ⚙️
+          </button>
 
           <button
             onClick={() => {
@@ -501,6 +850,33 @@ export function ViewerAppContent({
       </div>
 
       {headerSlot}
+
+      {/* JSONL Detection Banner */}
+      {!isJsonlMode && isJsonlDetected && (
+        <div
+          className="flex flex-wrap items-center justify-between border-b px-4 py-2 text-xs font-mono"
+          style={{
+            backgroundColor: `${theme.colors.accent}20`,
+            borderColor: theme.colors.border,
+            color: theme.colors.fg,
+          }}
+        >
+          <span>💡 Line-delimited JSON (JSONL / NDJSON) detected in this file.</span>
+          <button
+            onClick={() => {
+              track("feature_used", { feature: "jsonl_mode" });
+              setIsJsonlMode(true);
+            }}
+            className="rounded px-2.5 py-1 font-semibold transition-colors hover:opacity-90"
+            style={{
+              backgroundColor: theme.colors.accent,
+              color: "#ffffff",
+            }}
+          >
+            Switch to JSONL Viewer →
+          </button>
+        </div>
+      )}
 
       {/* Parse Status / Error Banner */}
       {(stringParseError || parseMode !== "strict") && (rows || error) && (
@@ -528,8 +904,25 @@ export function ViewerAppContent({
             )}
           </div>
           {stringParseError && (
-            <div className="max-w-xl truncate text-xs opacity-90">
-              {stringParseError.snippet ? `Snippet: "${stringParseError.snippet}"` : stringParseError.message}
+            <div className="flex items-center gap-3">
+              <div className="max-w-md truncate text-xs opacity-90">
+                {stringParseError.snippet ? `Snippet: "${stringParseError.snippet}"` : stringParseError.message}
+              </div>
+              <button
+                onClick={() => {
+                  track("feature_used", { feature: "repair" });
+                  const res = repairJson(rawText);
+                  setRepairResult(res);
+                  setRepairModalOpen(true);
+                }}
+                className="rounded px-2.5 py-1 text-xs font-semibold transition-colors hover:opacity-90 shrink-0"
+                style={{
+                  backgroundColor: "#ffffff",
+                  color: "#c0392b",
+                }}
+              >
+                🔧 Repair JSON
+              </button>
             </div>
           )}
         </div>
@@ -542,16 +935,110 @@ export function ViewerAppContent({
           matchCount={matches.length}
           activeMatchIndex={activeMatchIndex}
           activeMatchPath={revealTarget}
-          onQueryChange={(q) => {
+          isInvalidRegex={isInvalidRegex}
+          rawText={rawText}
+          canReplace={!!rows && !error}
+          allMatches={matches}
+          onRevealPath={revealPath}
+          onQueryChange={(q, opts) => {
             // Once per search session (fires again only after the box is
             // cleared), so a 20-character query isn't 20 events.
             if (q && !searchQuery) track("feature_used", { feature: "search" });
             setSearchQuery(q);
-            search(q);
+            search(q, opts);
           }}
           onNext={() => goToMatch(1)}
           onPrev={() => goToMatch(-1)}
+          onReplace={handleReplace}
+          onReplaceAll={(find, replace) => handleReplaceAll(find, replace)}
         />
+      )}
+
+      {/* Minifier Stats Bar */}
+      {minifyStats && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2 font-mono text-xs"
+          style={{
+            backgroundColor: theme.colors.panel,
+            borderColor: theme.colors.border,
+            color: theme.colors.fg,
+          }}
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <span>
+              Original:{" "}
+              <strong>{minifyStats.originalBytes >= 1024 * 1024
+                ? `${(minifyStats.originalBytes / 1024 / 1024).toFixed(2)} MB`
+                : `${(minifyStats.originalBytes / 1024).toFixed(1)} KB`}</strong>
+            </span>
+            <span style={{ color: theme.colors.muted }}>→</span>
+            <span>
+              Minified:{" "}
+              <strong style={{ color: theme.colors.accent }}>
+                {minifyStats.minifiedBytes >= 1024 * 1024
+                  ? `${(minifyStats.minifiedBytes / 1024 / 1024).toFixed(2)} MB`
+                  : `${(minifyStats.minifiedBytes / 1024).toFixed(1)} KB`}
+              </strong>
+            </span>
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+              style={{
+                backgroundColor: `${theme.colors.accent}25`,
+                color: theme.colors.accent,
+              }}
+            >
+              Saved{" "}
+              {minifyStats.originalBytes > 0
+                ? `${Math.round((1 - minifyStats.minifiedBytes / minifyStats.originalBytes) * 100)}%`
+                : "0%"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(minifyStats.minifiedText);
+                setToast("Copied minified JSON");
+              }}
+              className="rounded px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80"
+              style={{
+                backgroundColor: theme.colors.hover,
+                color: theme.colors.fg,
+                border: `1px solid ${theme.colors.border}`,
+              }}
+            >
+              Copy minified
+            </button>
+            <button
+              onClick={() => {
+                const blob = new Blob([minifyStats.minifiedText], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "document.min.json";
+                a.click();
+                URL.revokeObjectURL(url);
+                setToast("Downloaded document.min.json");
+              }}
+              className="rounded px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-80"
+              style={{
+                backgroundColor: theme.colors.hover,
+                color: theme.colors.fg,
+                border: `1px solid ${theme.colors.border}`,
+              }}
+            >
+              Download .min.json
+            </button>
+            <button
+              onClick={() => setMinifyStats(null)}
+              title="Dismiss"
+              className="px-1.5 py-1 text-xs opacity-50 hover:opacity-100 transition-opacity"
+              style={{ color: theme.colors.muted }}
+              aria-label="Close minifier stats"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Compare Mode Header */}
@@ -581,7 +1068,14 @@ export function ViewerAppContent({
 
       {/* Main Workspace Area */}
       <main className="min-h-0 flex-1 overflow-hidden">
-        {error && !rows && (
+        {isJsonlMode ? (
+          <JsonlViewer
+            summary={parseJsonl(rawText)}
+            onExitJsonl={() => setIsJsonlMode(false)}
+          />
+        ) : (
+          <>
+            {error && !rows && (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-8 text-center">
             <p className="font-mono text-sm font-semibold" style={{ color: theme.colors.diffRemoved }}>
               {error.message}
@@ -623,11 +1117,23 @@ export function ViewerAppContent({
 
         {rows && !isComparing && (
           viewLayout === "split" ? (
-            <div className="flex h-full w-full overflow-hidden">
+            <div
+              className="flex h-full w-full overflow-hidden select-none"
+              onMouseMove={(e) => {
+                if (!isDraggingRef.current) return;
+                const container = e.currentTarget;
+                const rect = container.getBoundingClientRect();
+                const ratio = Math.min(80, Math.max(20, ((e.clientX - rect.left) / rect.width) * 100));
+                setSplitRatio(ratio);
+                try { localStorage.setItem("devure-json:split-ratio", String(ratio)); } catch { /* ignore */ }
+              }}
+              onMouseUp={() => { isDraggingRef.current = false; }}
+              onMouseLeave={() => { isDraggingRef.current = false; }}
+            >
               {/* Left Pane: Syntax-Highlighted Themed JSON Editor */}
               <div
-                className="flex flex-1 flex-col border-r overflow-hidden"
-                style={{ borderColor: theme.colors.border }}
+                className="flex flex-col overflow-hidden"
+                style={{ width: `${splitRatio}%`, minWidth: 0 }}
               >
                 <div
                   className="flex items-center justify-between border-b px-3 py-1.5 text-xs font-mono font-semibold uppercase tracking-wider"
@@ -657,13 +1163,51 @@ export function ViewerAppContent({
                 </div>
               </div>
 
+              {/* Drag Handle */}
+              <div
+                className="group relative z-10 flex w-2 shrink-0 cursor-col-resize items-center justify-center transition-colors"
+                style={{ backgroundColor: theme.colors.border }}
+                onMouseDown={(e) => { e.preventDefault(); isDraggingRef.current = true; }}
+                title="Drag to resize panes"
+              >
+                <div
+                  className="h-8 w-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ backgroundColor: theme.colors.accent }}
+                />
+              </div>
+
               {/* Right Pane: Interactive Virtualized Tree Cells */}
+              <div className="flex-1 overflow-hidden min-w-0">
+                <JsonTree
+                  rows={rows}
+                  onToggle={toggle}
+                  revealTarget={revealTarget}
+                  searchQuery={searchQuery}
+                  onToast={setToast}
+                />
+              </div>
+            </div>
+          ) : viewLayout === "preview" ? (
+            /* Preview mode — read-only calm presentation, no edit affordances */
+            <div className="flex h-full flex-col overflow-hidden">
+              <div
+                className="flex items-center justify-between border-b px-4 py-2 text-xs font-mono"
+                style={{
+                  backgroundColor: theme.colors.panel,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.muted,
+                }}
+              >
+                <span className="uppercase tracking-wider text-[11px] font-semibold">Preview — Read Only</span>
+                <span className="text-[11px] opacity-60">Switch to Split or Tree to edit</span>
+              </div>
               <div className="flex-1 overflow-hidden">
                 <JsonTree
                   rows={rows}
                   onToggle={toggle}
                   revealTarget={revealTarget}
                   searchQuery={searchQuery}
+                  onToast={setToast}
                 />
               </div>
             </div>
@@ -673,16 +1217,19 @@ export function ViewerAppContent({
               onToggle={toggle}
               revealTarget={revealTarget}
               searchQuery={searchQuery}
+              onToast={setToast}
             />
           )
         )}
 
-        {!error && !isLoading && !rows && (
-          <EmptyState
-            recent={recent}
-            onSelect={(text) => openText(text, "recent")}
-            onClear={clearRecentFiles}
-          />
+            {!error && !isLoading && !rows && (
+              <EmptyState
+                recent={recent}
+                onSelect={(text) => openText(text, "recent")}
+                onClear={clearRecentFiles}
+              />
+            )}
+          </>
         )}
       </main>
 
@@ -691,6 +1238,34 @@ export function ViewerAppContent({
           onClose={() => setPaletteOpen(false)}
           onSelectCommand={handleSelectCommand}
           commands={commands}
+        />
+      )}
+
+      {shortcutsModalOpen && (
+        <ShortcutsModal onClose={() => setShortcutsModalOpen(false)} />
+      )}
+
+      {settingsOpen && (
+        <SettingsModal
+          onClose={() => setSettingsOpen(false)}
+          onSettingsChange={(s) => {
+            setAppSettings(s);
+            // Sync theme immediately from settings
+            if (s.themeId !== theme.id) setThemeId(s.themeId);
+          }}
+        />
+      )}
+
+      {repairModalOpen && repairResult && (
+        <RepairModal
+          originalText={rawText}
+          repairResult={repairResult}
+          onClose={() => setRepairModalOpen(false)}
+          onApprove={(repairedText) => {
+            openText(repairedText, "edit");
+            setToast("Applied repaired JSON");
+            setRepairModalOpen(false);
+          }}
         />
       )}
 

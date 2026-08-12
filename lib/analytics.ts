@@ -24,10 +24,14 @@ export type Feature =
   | "search"
   | "copy_formatted"
   | "copy_minified"
+  | "download"
   | "theme_change"
   | "view_toggle"
   | "command_palette"
-  | "tree_expand";
+  | "tree_expand"
+  | "minify"
+  | "repair"
+  | "jsonl_mode";
 
 type AnalyticsEvent =
   // Activation: a document was successfully parsed and rendered.

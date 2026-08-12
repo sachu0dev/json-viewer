@@ -53,8 +53,55 @@ export function ancestorsOf(path: string): string[] {
 
 const MAX_SEARCH_RESULTS = 500;
 
-export function searchDocument(root: JsonValue, query: string): string[] {
-  const needle = query.toLowerCase();
+export interface SearchOptions {
+  caseSensitive?: boolean;
+  isRegex?: boolean;
+  /** Which part of the document to search. Default: 'all' (keys + values). */
+  scope?: "all" | "keys" | "values" | "paths";
+  /** When true, the full key/value/path must equal the query (not just contain it). Default: false (partial). */
+  exactMatch?: boolean;
+}
+
+/** Returns null if the regex pattern is invalid (only relevant when isRegex=true). */
+export function buildSearchMatcher(query: string, opts: SearchOptions): ((haystack: string) => boolean) | null {
+  if (opts.isRegex) {
+    try {
+      const flags = opts.caseSensitive ? "" : "i";
+      const re = new RegExp(query, flags);
+      return (s) => re.test(s);
+    } catch {
+      return null; // invalid regex
+    }
+  }
+  if (opts.caseSensitive) {
+    return (s) => s.includes(query);
+  }
+  const lower = query.toLowerCase();
+  return (s) => s.toLowerCase().includes(lower);
+}
+
+export function searchDocument(root: JsonValue, query: string, opts: SearchOptions = {}): string[] {
+  if (!query.trim()) return [];
+
+  const scope = opts.scope ?? "all";
+  const exactMatch = opts.exactMatch ?? false;
+
+  // Build the matcher — for exact match we wrap to require full equality
+  let matchFn: ((haystack: string) => boolean) | null;
+  if (exactMatch) {
+    const baseFn = buildSearchMatcher(query, opts);
+    if (!baseFn) return []; // invalid regex
+    const cq = opts.caseSensitive ? query : query.toLowerCase();
+    matchFn = (s: string) => {
+      const cs = opts.caseSensitive ? s : s.toLowerCase();
+      return opts.isRegex ? baseFn(s) && new RegExp(`^(?:${query})$`, opts.caseSensitive ? "" : "i").test(s) : cs === cq;
+    };
+  } else {
+    matchFn = buildSearchMatcher(query, opts);
+  }
+  if (!matchFn) return []; // invalid regex
+
+  const matchFnSafe: (haystack: string) => boolean = matchFn;
   const results: string[] = [];
 
   function visit(value: JsonValue, path: string) {
@@ -65,9 +112,16 @@ export function searchDocument(root: JsonValue, query: string): string[] {
       for (const [key, child] of Object.entries(value as Record<string, JsonValue>)) {
         if (results.length >= MAX_SEARCH_RESULTS) return;
         const path2 = childPath(path, key);
-        if (key.toLowerCase().includes(needle)) {
+
+        const keyMatches = (scope === "all" || scope === "keys") && matchFnSafe(key);
+        const pathMatches = scope === "paths" && matchFnSafe(path2);
+
+        if (keyMatches || pathMatches) {
           results.push(path2);
+        } else if (scope !== "keys" && scope !== "paths") {
+          visit(child, path2);
         } else {
+          // keys-only or paths scope: still recurse but skip value matching
           visit(child, path2);
         }
       }
@@ -75,8 +129,14 @@ export function searchDocument(root: JsonValue, query: string): string[] {
       (value as JsonValue[]).forEach((child, index) => {
         if (results.length < MAX_SEARCH_RESULTS) visit(child, childPath(path, index));
       });
-    } else if (String(value).toLowerCase().includes(needle)) {
-      results.push(path);
+    } else {
+      // Leaf node
+      const valStr = String(value);
+      const pathMatches = scope === "paths" && matchFnSafe(path);
+      const valMatches = (scope === "all" || scope === "values") && matchFnSafe(valStr);
+      if (pathMatches || valMatches) {
+        results.push(path);
+      }
     }
   }
 
@@ -348,4 +408,37 @@ export function buildFlatRows(root: JsonValue, expandedPaths: Set<string>): Row[
 
   visit(root, "$", null, 0);
   return rows;
+}
+
+export interface FormatOptions {
+  /** Number of spaces, or "tab" for tab indentation, or 0 for compact */
+  indent: 2 | 4 | "tab" | 0;
+  /** Sort object keys alphabetically */
+  sortKeys: boolean;
+  /** Append a trailing newline to the output */
+  trailingNewline: boolean;
+}
+
+export const DEFAULT_FORMAT_OPTIONS: FormatOptions = {
+  indent: 2,
+  sortKeys: false,
+  trailingNewline: false,
+};
+
+function sortedReplacer(_key: string, value: JsonValue): JsonValue {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    const sorted: Record<string, JsonValue> = {};
+    for (const k of Object.keys(value as Record<string, JsonValue>).sort()) {
+      sorted[k] = (value as Record<string, JsonValue>)[k];
+    }
+    return sorted;
+  }
+  return value;
+}
+
+export function stringifyWithOptions(doc: JsonValue, opts: FormatOptions): string {
+  const replacer = opts.sortKeys ? sortedReplacer : null;
+  const indentArg: number | string = opts.indent === "tab" ? "\t" : opts.indent;
+  const text = JSON.stringify(doc, replacer as (key: string, value: unknown) => unknown, indentArg);
+  return opts.trailingNewline ? text + "\n" : text;
 }

@@ -6,6 +6,7 @@ import { useTheme } from "@/hooks/useTheme";
 export interface Command {
   id: string;
   label: string;
+  shortcut?: string;
 }
 
 export function CommandPalette({
@@ -101,13 +102,25 @@ export function CommandPalette({
                     onSelectCommand(command.id);
                     onClose();
                   }}
-                  className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors"
+                  className="flex w-full items-center justify-between gap-4 px-4 py-2.5 text-left text-sm transition-colors"
                   style={{
                     backgroundColor: isSelected ? theme.colors.active : "transparent",
                     color: theme.colors.fg,
                   }}
                 >
                   <span>{command.label}</span>
+                  {command.shortcut && (
+                    <kbd
+                      className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] opacity-60"
+                      style={{
+                        backgroundColor: theme.colors.hover,
+                        color: theme.colors.muted,
+                        border: `1px solid ${theme.colors.border}`,
+                      }}
+                    >
+                      {command.shortcut}
+                    </kbd>
+                  )}
                 </button>
               </li>
             );

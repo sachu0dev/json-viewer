@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DiffEntry, ParseError, Row, SideBySideDiffRow } from "@/lib/json-document";
+import type { DiffEntry, FormatOptions, ParseError, Row, SearchOptions, SideBySideDiffRow } from "@/lib/json-document";
 import type { ParseMode } from "@/lib/json-parser";
 import type { WorkerRequest, WorkerResponse } from "@/workers/json.worker";
 
@@ -17,6 +17,7 @@ export function useJsonDocument() {
   const [matches, setMatches] = useState<string[]>([]);
   const [activeMatchIndex, setActiveMatchIndex] = useState(-1);
   const [revealTarget, setRevealTarget] = useState<string | null>(null);
+  const [isInvalidRegex, setIsInvalidRegex] = useState(false);
 
   const [diffEntries, setDiffEntries] = useState<DiffEntry[] | null>(null);
   const [sideBySideRows, setSideBySideRows] = useState<SideBySideDiffRow[] | null>(null);
@@ -51,10 +52,13 @@ export function useJsonDocument() {
         setJsEvalStatus(data.jsEvalStatus);
       } else if (data.type === "search-results") {
         setMatches(data.paths);
+        setIsInvalidRegex(data.isInvalidRegex);
         setActiveMatchIndex(data.paths.length > 0 ? 0 : -1);
         if (data.paths.length > 0) {
           setRevealTarget(data.paths[0]);
           worker.postMessage({ type: "reveal", path: data.paths[0] } satisfies WorkerRequest);
+        } else {
+          setRevealTarget(null);
         }
       } else if (data.type === "diff") {
         setDiffEntries(data.entries);
@@ -95,10 +99,10 @@ export function useJsonDocument() {
 
   // Debounced search (150ms delay) to prevent UI lag on rapid typing
   const search = useCallback(
-    (query: string) => {
+    (query: string, opts?: SearchOptions) => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       searchTimerRef.current = setTimeout(() => {
-        send({ type: "search", query });
+        send({ type: "search", query, opts });
       }, 150);
     },
     [send],
@@ -115,6 +119,16 @@ export function useJsonDocument() {
     [matches, activeMatchIndex, send],
   );
 
+  const revealPath = useCallback(
+    (path: string) => {
+      const idx = matches.indexOf(path);
+      if (idx !== -1) setActiveMatchIndex(idx);
+      setRevealTarget(path);
+      send({ type: "reveal", path });
+    },
+    [matches, send],
+  );
+
   const compare = useCallback((text: string) => send({ type: "compare", text }), [send]);
 
   const clearCompare = useCallback(() => {
@@ -124,11 +138,14 @@ export function useJsonDocument() {
     send({ type: "clear-compare" });
   }, [send]);
 
+  const expandAll = useCallback(() => send({ type: "expand-all" }), [send]);
+  const collapseAll = useCallback(() => send({ type: "collapse-all" }), [send]);
+
   const stringify = useCallback(
-    (mode: "pretty" | "compact") =>
+    (mode: "pretty" | "compact", formatOptions?: FormatOptions) =>
       new Promise<string>((resolve) => {
         stringifyResolverRef.current = resolve;
-        send({ type: "stringify", mode });
+        send({ type: "stringify", mode, formatOptions });
       }),
     [send],
   );
@@ -146,7 +163,11 @@ export function useJsonDocument() {
     matches,
     activeMatchIndex,
     revealTarget,
+    isInvalidRegex,
     goToMatch,
+    revealPath,
+    expandAll,
+    collapseAll,
     diffEntries,
     sideBySideRows,
     compareError,
