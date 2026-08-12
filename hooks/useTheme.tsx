@@ -13,6 +13,7 @@ import {
 import {
   THEMES,
   DEFAULT_THEME_ID,
+  THEME_STORAGE_KEY,
   getSavedThemeId,
   getThemeById,
   saveThemeId,
@@ -53,6 +54,17 @@ export function ThemeProvider({ children }: { children: ReactNode }): ReactEleme
   useIsomorphicLayoutEffect(() => {
     const saved = getSavedThemeId();
     if (saved !== DEFAULT_THEME_ID) setThemeIdState(saved);
+  }, []);
+
+  useEffect(() => {
+    function handleStorage(e: StorageEvent) {
+      if (!e.key || e.key === THEME_STORAGE_KEY || e.key === "devure-json:settings") {
+        const saved = getSavedThemeId();
+        setThemeIdState(saved);
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   useEffect(() => {

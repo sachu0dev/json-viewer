@@ -11,6 +11,8 @@
 
 import type { FormatOptions } from "./json-document";
 
+import { DEFAULT_THEME_ID, getSavedThemeId, THEMES } from "./themes.ts";
+
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 export interface AppSettings {
@@ -35,7 +37,7 @@ export interface AppSettings {
 }
 
 const DEFAULTS: AppSettings = {
-  themeId: "dark",
+  themeId: DEFAULT_THEME_ID,
   formatIndent: 2,
   formatSortKeys: false,
   formatTrailingNewline: false,
@@ -51,14 +53,19 @@ const STORAGE_KEY = "devure-json:settings";
 // ─── Read / write ─────────────────────────────────────────────────────────────
 
 export function loadSettings(): AppSettings {
-  if (typeof window === "undefined") return { ...DEFAULTS };
+  const currentSavedTheme = getSavedThemeId();
+  const defaultSettings: AppSettings = { ...DEFAULTS, themeId: currentSavedTheme };
+  if (typeof window === "undefined") return defaultSettings;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULTS };
+    if (!raw) return defaultSettings;
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return { ...DEFAULTS, ...parsed };
+    const themeId = parsed.themeId && THEMES.some((t) => t.id === parsed.themeId)
+      ? parsed.themeId
+      : currentSavedTheme;
+    return { ...defaultSettings, ...parsed, themeId };
   } catch {
-    return { ...DEFAULTS };
+    return defaultSettings;
   }
 }
 

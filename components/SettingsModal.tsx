@@ -140,7 +140,7 @@ const SHORTCUT_GROUPS = [
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function SettingsModal({ onClose, onSettingsChange }: Props) {
-  const { theme } = useTheme();
+  const { theme, setThemeId } = useTheme();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabId>("appearance");
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
@@ -252,9 +252,12 @@ export function SettingsModal({ onClose, onSettingsChange }: Props) {
               <div>
                 <Row label="Theme">
                   <Select
-                    value={settings.themeId}
+                    value={theme.id}
                     options={THEMES.map((t: { id: string; name: string }) => ({ value: t.id, label: t.name }))}
-                    onChange={(v) => updateAndNotify({ themeId: v })}
+                    onChange={(v) => {
+                      setThemeId(v);
+                      updateAndNotify({ themeId: v });
+                    }}
                   />
                 </Row>
                 <div style={sep} />

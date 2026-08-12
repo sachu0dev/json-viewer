@@ -598,6 +598,7 @@ export function ViewerAppContent({
       const targetThemeId = commandId.slice(6);
       track("feature_used", { feature: "theme_change" });
       setThemeId(targetThemeId);
+      setAppSettings((prev) => ({ ...prev, themeId: targetThemeId }));
       const selected = themes.find((t) => t.id === targetThemeId);
       if (selected) setToast(`Theme changed to ${selected.name}`);
     } else if (commandId === "portfolio") {
@@ -857,9 +858,11 @@ export function ViewerAppContent({
           <select
             value={theme.id}
             onChange={(e) => {
+              const newThemeId = e.target.value;
               track("feature_used", { feature: "theme_change" });
-              setThemeId(e.target.value);
-              const selected = themes.find((t) => t.id === e.target.value);
+              setThemeId(newThemeId);
+              setAppSettings((prev) => ({ ...prev, themeId: newThemeId }));
+              const selected = themes.find((t) => t.id === newThemeId);
               if (selected) setToast(`Theme: ${selected.name}`);
             }}
             className="max-w-[90px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap bg-transparent px-2 py-1 text-xs outline-none transition-colors sm:max-w-none"

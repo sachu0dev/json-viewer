@@ -36,3 +36,9 @@ test("getThemeById returns requested theme or default fallback", () => {
   const fallback = getThemeById("unknown-theme-xyz");
   assert.strictEqual(fallback.id, DEFAULT_THEME_ID);
 });
+
+test("loadSettings initializes with a valid theme ID", async () => {
+  const { loadSettings } = await import("./settings.ts");
+  const settings = loadSettings();
+  assert.ok(THEMES.some((t) => t.id === settings.themeId), `Theme ID '${settings.themeId}' must be a valid theme ID`);
+});

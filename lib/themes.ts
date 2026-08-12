@@ -278,7 +278,19 @@ export function getThemeById(id: string): Theme {
 export function getSavedThemeId(): string {
   if (typeof window === "undefined") return DEFAULT_THEME_ID;
   try {
-    return localStorage.getItem(THEME_STORAGE_KEY) || DEFAULT_THEME_ID;
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved && THEMES.some((t) => t.id === saved)) return saved;
+
+    // Fall back to devure-json:settings if present
+    const rawSettings = localStorage.getItem("devure-json:settings");
+    if (rawSettings) {
+      const parsed = JSON.parse(rawSettings);
+      if (parsed.themeId && THEMES.some((t) => t.id === parsed.themeId)) {
+        return parsed.themeId;
+      }
+    }
+
+    return DEFAULT_THEME_ID;
   } catch {
     return DEFAULT_THEME_ID;
   }
@@ -286,8 +298,15 @@ export function getSavedThemeId(): string {
 
 export function saveThemeId(id: string): void {
   if (typeof window === "undefined") return;
+  const validTheme = THEMES.some((t) => t.id === id) ? id : DEFAULT_THEME_ID;
   try {
-    localStorage.setItem(THEME_STORAGE_KEY, id);
+    localStorage.setItem(THEME_STORAGE_KEY, validTheme);
+
+    // Sync with devure-json:settings
+    const rawSettings = localStorage.getItem("devure-json:settings");
+    const settings = rawSettings ? JSON.parse(rawSettings) : {};
+    settings.themeId = validTheme;
+    localStorage.setItem("devure-json:settings", JSON.stringify(settings));
   } catch {
     // ignore storage errors
   }
