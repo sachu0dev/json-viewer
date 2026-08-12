@@ -68,8 +68,12 @@ function shapeToTsType(shape: ShapeNode): string {
       return shape.type === "null" ? "null" : shape.type;
     case "object":
       return shape.name;
-    case "array":
-      return `${shapeToTsType(shape.elementType)}[]`;
+    case "array": {
+      const elementTypeStr = shapeToTsType(shape.elementType);
+      // `Item | null[]` parses as `Item | (null[])` — a union element type
+      // needs parens so the array applies to the whole union, not the tail.
+      return shape.elementType.kind === "union" ? `(${elementTypeStr})[]` : `${elementTypeStr}[]`;
+    }
     case "union":
       return shape.types.map(shapeToTsType).join(" | ");
   }

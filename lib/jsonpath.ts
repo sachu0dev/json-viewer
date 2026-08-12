@@ -20,7 +20,11 @@ export interface JsonPathQueryResult {
   results: JsonPathResult[];
   executionMs: number;
   error: string | null;
+  /** True when the underlying match count exceeds the 500-result render cap. */
+  truncated: boolean;
 }
+
+const MAX_RESULTS = 500;
 
 export const EXAMPLE_QUERIES: { label: string; query: string }[] = [
   { label: "All values", query: "$.*" },
@@ -40,36 +44,33 @@ export const EXAMPLE_QUERIES: { label: string; query: string }[] = [
  */
 export function executeJsonPath(doc: JsonValue, expression: string): JsonPathQueryResult {
   if (!expression.trim()) {
-    return { results: [], executionMs: 0, error: null };
+    return { results: [], executionMs: 0, error: null, truncated: false };
   }
 
   const t0 = performance.now();
   try {
-    const rawPaths: string[] = JSONPath({
+    // A single `resultType: "all"` pass returns both path and value per
+    // match — the previous code ran the same query twice (once for paths,
+    // once for values) to assemble the same information.
+    const matches: Array<{ path: string; value: JsonValue }> = JSONPath({
       path: expression,
       json: doc as object,
-      resultType: "path",
-    }) as string[];
+      resultType: "all",
+    }) as Array<{ path: string; value: JsonValue }>;
 
-    const rawValues: JsonValue[] = JSONPath({
-      path: expression,
-      json: doc as object,
-      resultType: "value",
-    }) as JsonValue[];
-
-    const results: JsonPathResult[] = rawPaths.slice(0, 500).map((p, i) => ({
+    const results: JsonPathResult[] = matches.slice(0, MAX_RESULTS).map((m) => ({
       // jsonpath-plus returns paths like $['users'][0]['email']
       // normalize to dot-bracket form: $.users[0].email
-      path: normalizePath(p),
-      value: rawValues[i] ?? null,
+      path: normalizePath(m.path),
+      value: m.value ?? null,
     }));
 
     const executionMs = +(performance.now() - t0).toFixed(2);
-    return { results, executionMs, error: null };
+    return { results, executionMs, error: null, truncated: matches.length > MAX_RESULTS };
   } catch (err) {
     const executionMs = +(performance.now() - t0).toFixed(2);
     const error = err instanceof Error ? err.message : String(err);
-    return { results: [], executionMs, error: friendlyError(error) };
+    return { results: [], executionMs, error: friendlyError(error), truncated: false };
   }
 }
 

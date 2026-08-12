@@ -24,6 +24,7 @@ import { RepairModal } from "@/components/RepairModal";
 import { repairJson, type RepairResult } from "@/lib/json-repair";
 import { isJsonlContent, parseJsonl } from "@/lib/jsonl-parser";
 import { JsonlViewer } from "@/components/JsonlViewer";
+import { useDialog } from "@/components/DialogProvider";
 
 function tryAutoFormat(text: string): string {
   try {
@@ -65,8 +66,19 @@ export function ViewerAppContent({
     clearCompare,
     stringify,
   } = useJsonDocument();
-  const { recent, record, clear: clearRecentFiles } = useRecentFiles();
+  const { recent, record, clear: clearRecentFiles, removeOne: removeRecentOne } = useRecentFiles();
   const { theme, setThemeId, themes } = useTheme();
+  const dialog = useDialog();
+
+  const handleClearRecent = useCallback(async () => {
+    const ok = await dialog.confirm({
+      title: "Clear recent files",
+      message: `Remove all ${recent.length} recent file${recent.length === 1 ? "" : "s"} from local history? This can't be undone.`,
+      confirmLabel: "Clear",
+      danger: true,
+    });
+    if (ok) clearRecentFiles();
+  }, [dialog, recent.length, clearRecentFiles]);
   const searchInputRef = useRef<SearchBarHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -89,7 +101,7 @@ export function ViewerAppContent({
   const isDraggingRef = useRef(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [, setAppSettings] = useState<AppSettings>(() => loadSettings());
+  const [appSettings, setAppSettings] = useState<AppSettings>(() => loadSettings());
   const [repairModalOpen, setRepairModalOpen] = useState(false);
   const [repairResult, setRepairResult] = useState<RepairResult | null>(null);
   const [isJsonlMode, setIsJsonlMode] = useState(false);
@@ -121,10 +133,10 @@ export function ViewerAppContent({
   const pendingSaveRef = useRef<string | null>(null);
   useEffect(() => {
     if (rows && !isLoading && !error && pendingSaveRef.current !== null) {
-      record(pendingSaveRef.current);
+      if (appSettings.historyEnabled) record(pendingSaveRef.current);
       pendingSaveRef.current = null;
     }
-  }, [rows, isLoading, error, record]);
+  }, [rows, isLoading, error, record, appSettings.historyEnabled]);
 
   // Set when a document enters from outside the editor; consumed once the
   // worker reports back, so the outcome (activated vs. bounced off a parse
@@ -517,8 +529,8 @@ export function ViewerAppContent({
 
   function handleConvertTo(slug: string) {
     track("feature_used", { feature: "convert" });
-    stringify("pretty").then((text) => {
-      const fragment = encodeShareFragment(text);
+    stringify("pretty").then(async (text) => {
+      const fragment = await encodeShareFragment(text);
       window.open(`/${slug}#${fragment}`, "_blank", "noopener");
     });
   }
@@ -536,10 +548,19 @@ export function ViewerAppContent({
       setIsJsonlMode((m) => !m);
     } else if (commandId === "open-settings") {
       setSettingsOpen(true);
+    } else if (commandId === "open-schema-validator") {
+      stringify("pretty").then(async (text) => {
+        const fragment = await encodeShareFragment(text);
+        window.open(`/json-schema-validator#${fragment}`, "_blank", "noopener");
+      });
+    } else if (commandId === "open-jwt-decoder") {
+      window.open("/jwt-decoder", "_blank", "noopener");
+    } else if (commandId === "open-api-response") {
+      window.open("/api-response", "_blank", "noopener");
     } else if (commandId === "open-jsonpath") {
       // Encode current JSON into URL hash and navigate to the JSONPath page
-      stringify("pretty").then((text) => {
-        const fragment = encodeShareFragment(text);
+      stringify("pretty").then(async (text) => {
+        const fragment = await encodeShareFragment(text);
         window.open(`/jsonpath#${fragment}`, "_blank", "noopener");
       });
     } else if (commandId === "copy-formatted") {
@@ -572,7 +593,7 @@ export function ViewerAppContent({
     } else if (commandId === "shortcuts-sheet") {
       setShortcutsModalOpen(true);
     } else if (commandId === "clear-recent") {
-      clearRecentFiles();
+      handleClearRecent();
     } else if (commandId.startsWith("theme-")) {
       const targetThemeId = commandId.slice(6);
       track("feature_used", { feature: "theme_change" });
@@ -605,6 +626,9 @@ export function ViewerAppContent({
         { id: "download", label: "Download JSON", shortcut: `${mod}S` },
         { id: "share", label: "Share (copy link, no server)" },
         { id: "open-jsonpath", label: "Query with JSONPath…" },
+        { id: "open-schema-validator", label: "Validate against JSON Schema…" },
+        { id: "open-jwt-decoder", label: "Decode JWT Token…" },
+        { id: "open-api-response", label: "Inspect API Response…" },
         { id: "convert-to-json-to-typescript", label: "Convert to TypeScript" },
         { id: "convert-to-json-to-python", label: "Convert to Python" },
         { id: "convert-to-json-to-go", label: "Convert to Go" },
@@ -678,10 +702,32 @@ export function ViewerAppContent({
             JSON Viewer
           </Link>
 
+          <Link
+            href="/privacy"
+            className="hidden items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors hover:opacity-80 sm:flex"
+            style={{ borderColor: theme.colors.border, color: theme.colors.muted }}
+            title="This document is processed entirely in your browser — see how"
+          >
+            🔒 Local-only
+          </Link>
+
           <nav className="flex items-center gap-3 font-mono text-xs" style={{ color: theme.colors.muted }}>
             <Link href="/json-diff" className="hover:opacity-80 hover:underline">
               Diff
             </Link>
+
+            <Link href="/json-schema-validator" className="hover:opacity-80 hover:underline">
+              Schema
+            </Link>
+
+            <Link href="/jwt-decoder" className="hover:opacity-80 hover:underline">
+              JWT
+            </Link>
+
+            <Link href="/api-response" className="hover:opacity-80 hover:underline">
+              API
+            </Link>
+
             <Link href="/large-files" className="hover:opacity-80 hover:underline">
               Large files
             </Link>
@@ -849,8 +895,8 @@ export function ViewerAppContent({
               </button>
               <button
                 onClick={() => {
-                  stringify("pretty").then((text) => {
-                    const fragment = encodeShareFragment(text);
+                  stringify("pretty").then(async (text) => {
+                    const fragment = await encodeShareFragment(text);
                     window.open(`/jsonpath#${fragment}`, "_blank", "noopener");
                   });
                 }}
@@ -859,6 +905,19 @@ export function ViewerAppContent({
                 title="Open current JSON in the JSONPath playground"
               >
                 JSONPath…
+              </button>
+              <button
+                onClick={() => {
+                  stringify("pretty").then(async (text) => {
+                    const fragment = await encodeShareFragment(text);
+                    window.open(`/json-schema-validator#${fragment}`, "_blank", "noopener");
+                  });
+                }}
+                className="px-2.5 py-1 text-xs transition-colors hover:opacity-80"
+                style={{ color: theme.colors.muted }}
+                title="Validate the current JSON against a schema"
+              >
+                Schema…
               </button>
 
               <select
@@ -1338,7 +1397,8 @@ export function ViewerAppContent({
               <EmptyState
                 recent={recent}
                 onSelect={(text) => openText(text, "recent")}
-                onClear={clearRecentFiles}
+                onClear={handleClearRecent}
+                onRemoveOne={removeRecentOne}
               />
             )}
           </>
@@ -1361,6 +1421,9 @@ export function ViewerAppContent({
         <SettingsModal
           onClose={() => setSettingsOpen(false)}
           onSettingsChange={(s) => {
+            // Turning history off is a privacy choice — honor it by wiping
+            // what's already stored, not just stopping future writes.
+            if (appSettings.historyEnabled && !s.historyEnabled) clearRecentFiles();
             setAppSettings(s);
             // Sync theme immediately from settings
             if (s.themeId !== theme.id) setThemeId(s.themeId);

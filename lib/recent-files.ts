@@ -17,6 +17,11 @@ export interface RecentFile {
 const DB_NAME = "json-viewer";
 const STORE = "recent";
 const MAX_RECENT = 20;
+// Total bytes across all stored `text` fields. IndexedDB quotas are much
+// larger than localStorage's, but pasting twenty multi-MB documents in a
+// row would otherwise grow this store unbounded — evict oldest-first once
+// the running total crosses this budget, same as the count cap does.
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -62,10 +67,19 @@ export async function saveRecent(text: string): Promise<void> {
     savedAt: Date.now(),
   } satisfies RecentFile);
 
-  withoutDuplicate
-    .sort((a, b) => b.savedAt - a.savedAt)
-    .slice(MAX_RECENT - 1)
-    .forEach((stale) => store.delete(stale.id));
+  // Evict oldest-first past the count cap, then keep evicting past the byte
+  // budget — the just-saved entry is exempt from both since it's what
+  // triggered eviction and is always the newest.
+  const rest = withoutDuplicate.sort((a, b) => b.savedAt - a.savedAt);
+  const overCount = rest.slice(MAX_RECENT - 1);
+  const kept = rest.slice(0, MAX_RECENT - 1);
+  let runningBytes = new Blob([text]).size;
+  const overBudget: RecentFile[] = [];
+  for (const entry of kept) {
+    runningBytes += new Blob([entry.text]).size;
+    if (runningBytes > MAX_TOTAL_BYTES) overBudget.push(entry);
+  }
+  [...overCount, ...overBudget].forEach((stale) => store.delete(stale.id));
 
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
@@ -85,6 +99,16 @@ export async function clearRecent(): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
     tx.objectStore(STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function deleteRecentOne(id: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

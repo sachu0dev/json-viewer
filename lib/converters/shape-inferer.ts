@@ -103,9 +103,12 @@ function walkValue(value: unknown, suggestedName: string, collected: ObjectShape
       return { kind: "array", elementType: { kind: "primitive", type: "any" } };
     }
 
-    const elementShapes = value.map((item, idx) =>
-      walkValue(item, singularize(suggestedName) + (idx > 0 ? `${idx + 1}` : ""), collected)
-    );
+    // Each element is walked against its own throwaway `collected` list, not
+    // the shared one — otherwise every element registers itself as its own
+    // object (Item, Item2, Item3…) before mergeShapes below has a chance to
+    // fold them into one shape, and a same-named-but-unmerged entry wins the
+    // dedupe in deduplicateAndOrderObjects. Only the merged result is real.
+    const elementShapes = value.map((item) => walkValue(item, singularize(suggestedName), []));
 
     const merged = mergeShapes(elementShapes, singularize(suggestedName), collected);
     return { kind: "array", elementType: merged };
@@ -140,33 +143,60 @@ function walkValue(value: unknown, suggestedName: string, collected: ObjectShape
 
 function mergeShapes(shapes: ShapeNode[], suggestedName: string, collected: ObjectShape[]): ShapeNode {
   if (shapes.length === 0) return { kind: "primitive", type: "any" };
-  if (shapes.length === 1) return shapes[0];
+  if (shapes.length === 1) {
+    registerShapeObjects(shapes[0], collected);
+    return shapes[0];
+  }
 
   // Group by kind
   const objects = shapes.filter((s): s is ObjectShape => s.kind === "object");
-  const primitives = shapes.filter((s): s is PrimitiveShape => s.kind === "primitive");
+  const nonObjects = shapes.filter((s) => s.kind !== "object");
 
   // If all elements are objects, merge object fields
   if (objects.length === shapes.length) {
     return mergeObjectShapes(objects, suggestedName, collected);
   }
 
-  // Deduplicate unique primitives
-  const uniquePrimTypes = Array.from(new Set(primitives.map((p) => p.type)));
-  if (uniquePrimTypes.length === 1 && shapes.length === primitives.length) {
-    return primitives[0];
-  }
+  // Objects mixed with something else (e.g. an object next to `null`) still
+  // need to be merged into one canonical shape before joining the union —
+  // otherwise two objects that share a name but not fields (object equality
+  // below is by name only) collide in the dedupe pass and one loses fields.
+  const mergedObject = objects.length > 0 ? mergeObjectShapes(objects, suggestedName, collected) : null;
 
-  // Create union of unique shape kinds
-  const distinct: ShapeNode[] = [];
-  for (const s of shapes) {
-    if (!distinct.some((existing) => areShapesEquivalent(existing, s))) {
-      distinct.push(s);
+  const primitives = nonObjects.filter((s): s is PrimitiveShape => s.kind === "primitive");
+  if (mergedObject === null) {
+    const uniquePrimTypes = Array.from(new Set(primitives.map((p) => p.type)));
+    if (uniquePrimTypes.length === 1 && shapes.length === primitives.length) {
+      return primitives[0];
     }
   }
 
+  // Deduplicate the remaining (non-object) union members
+  const distinctNonObjects: ShapeNode[] = [];
+  for (const s of nonObjects) {
+    if (!distinctNonObjects.some((existing) => areShapesEquivalent(existing, s))) {
+      distinctNonObjects.push(s);
+    }
+  }
+
+  // Any object shape surviving into the union (nested inside an array or a
+  // union member) must be registered — a generator resolves an object member
+  // purely by name, so an unregistered one prints an undefined type.
+  for (const d of distinctNonObjects) registerShapeObjects(d, collected);
+
+  const distinct = mergedObject ? [mergedObject, ...distinctNonObjects] : distinctNonObjects;
   if (distinct.length === 1) return distinct[0];
   return { kind: "union", types: distinct };
+}
+
+function registerShapeObjects(shape: ShapeNode, collected: ObjectShape[]): void {
+  if (shape.kind === "object") {
+    if (!collected.some((o) => o.name === shape.name)) collected.push(shape);
+  } else if (shape.kind === "array") {
+    registerShapeObjects(shape.elementType, collected);
+  } else if (shape.kind === "union") {
+    for (const t of shape.types) registerShapeObjects(t, collected);
+  }
 }
 
 function mergeObjectShapes(objects: ObjectShape[], suggestedName: string, collected: ObjectShape[]): ObjectShape {
@@ -205,6 +235,13 @@ function areShapesEquivalent(a: ShapeNode, b: ShapeNode): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind === "primitive" && b.kind === "primitive") return a.type === b.type;
   if (a.kind === "object" && b.kind === "object") return a.name === b.name;
+  if (a.kind === "array" && b.kind === "array") return areShapesEquivalent(a.elementType, b.elementType);
+  if (a.kind === "union" && b.kind === "union") {
+    return (
+      a.types.length === b.types.length &&
+      a.types.every((t, i) => areShapesEquivalent(t, b.types[i]))
+    );
+  }
   return true;
 }
 

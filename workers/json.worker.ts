@@ -206,7 +206,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
 
   if (message.type === "jsonpath") {
     if (doc === null) {
-      respond({ type: "jsonpath-results", result: { results: [], executionMs: 0, error: "No document loaded" } });
+      respond({ type: "jsonpath-results", result: { results: [], executionMs: 0, error: "No document loaded", truncated: false } });
       return;
     }
     const result = executeJsonPath(doc, message.expression);

@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Devure JSON
 
-## Getting Started
+A free, local-first JSON workspace: viewer, formatter, differ, JSONPath
+playground, JSON Schema validator, JWT decoder, API response inspector, and
+JSON-to-code/config converters (TypeScript, Python, Go, Rust, Java, C#,
+Swift, JavaScript, CSV, YAML, XML, TOML, SQL) — all in one app.
 
-First, run the development server:
+**Nothing you paste ever leaves your browser.** Parsing runs inside a Web
+Worker and the tree view is virtualized, so multi-megabyte files stay
+responsive instead of freezing the tab. There's no server, no account, no
+upload step. See [`/privacy`](https://json.devure.in/privacy) (or
+[`components/PrivacyPage.tsx`](components/PrivacyPage.tsx)) for the exact
+architecture.
+
+## Features
+
+- **Viewer** — Tree and Split views, syntax highlighting, inline node
+  editing (add/rename/delete), auto-repair for common syntax errors,
+  minify/beautify.
+- **JSON Diff** — side-by-side comparison of two documents.
+- **JSONPath Playground** — query JSON with live results, expression
+  history, and a quick reference.
+- **Schema Validator** — Draft-07 / 2019-09 / 2020-12 (auto-detected),
+  humanized error messages, infer-a-schema-from-JSON, save/load named
+  schemas, and a built-in regex tester.
+- **JWT Decoder** — decodes header/payload, surfaces every standard claim
+  plus independent expiry and not-before status.
+- **API Response Inspector** — body-kind detection (JSON/HTML/XML/text),
+  cookie/header parsing.
+- **JSONL Viewer** — stream/inspect newline-delimited JSON.
+- **Large Files** — Web Worker parsing + virtualized rendering for
+  multi-MB documents.
+- **Converters** — JSON to TypeScript, Python, Go, Rust, Java, C#, Swift,
+  JavaScript, CSV, YAML, XML, TOML, SQL, with correct handling of mixed
+  array shapes and unions (not just the happy path).
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Other scripts:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint       # ESLint
+npm test           # unit tests (lib/*.test.ts)
+npm run build      # production build
+```
 
-## Learn More
+## Tech stack
 
-To learn more about Next.js, take a look at the following resources:
+Next.js (App Router) · React · TypeScript · Tailwind CSS · Ajv (JSON
+Schema) · jsonpath-plus · Web Workers for all parsing/diffing work.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Contributing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+See [CONTRIBUTING.md](CONTRIBUTING.md) — scope, what gets accepted, and
+how to open a PR.
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[PolyForm Noncommercial License 1.0.0](LICENSE) — free to use, modify,
+and share for any noncommercial purpose (personal projects, learning,
+research, nonprofit/education). Commercial use is reserved to the
+copyright holder. See [LICENSE](LICENSE) for the full terms, or contact
+[devure.in](https://devure.in) about commercial licensing.

@@ -25,6 +25,7 @@ export async function generateMetadata({
       title: config.title,
       description: config.description,
     },
+    alternates: { canonical: `/${converterSlug}` },
   };
 }
 

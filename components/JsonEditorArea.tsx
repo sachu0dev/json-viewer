@@ -11,11 +11,15 @@ export function JsonEditorArea({
   onChange,
   theme,
   searchQuery,
+  ariaLabel,
+  placeholder,
 }: {
   value: string;
   onChange: (val: string) => void;
   theme: Theme;
   searchQuery?: string;
+  ariaLabel?: string;
+  placeholder?: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
@@ -316,7 +320,8 @@ export function JsonEditorArea({
           onClick={handleSelect}
           onKeyUp={handleSelect}
           onKeyDown={handleKeyDown}
-          placeholder="Paste or type JSON or JS object literal here…"
+          placeholder={placeholder ?? "Paste or type JSON or JS object literal here…"}
+          aria-label={ariaLabel}
           className="absolute inset-0 h-full w-full resize-none border-0 bg-transparent p-3 font-mono text-xs outline-none whitespace-pre-wrap wrap-break-word"
           style={{
             lineHeight: "1.5rem",

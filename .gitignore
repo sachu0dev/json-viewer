@@ -43,3 +43,9 @@ next-env.d.ts
 
 # SEO audit reports (local artifacts, not project source)
 /audits/
+
+# Playwright (MCP tool output, test runs)
+/.playwright-mcp/
+/playwright-report/
+/test-results/
+/blob-report/

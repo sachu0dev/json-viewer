@@ -4,7 +4,17 @@ import { CONVERTER_SLUGS } from "@/lib/converters/registry";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const coreRoutes = ["", "/json-diff", "/large-files", "/jsonpath", "/jsonl-viewer"];
+  const coreRoutes = [
+    "",
+    "/json-diff",
+    "/large-files",
+    "/jsonpath",
+    "/jsonl-viewer",
+    "/json-schema-validator",
+    "/jwt-decoder",
+    "/api-response",
+    "/privacy",
+  ];
   const converterRoutes = CONVERTER_SLUGS.map((slug) => `/${slug}`);
   const allRoutes = [...coreRoutes, ...converterRoutes];
 

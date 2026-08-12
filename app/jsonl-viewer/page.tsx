@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     title: "JSONL / NDJSON Viewer | Devure JSON",
     description: "Inspect and validate large JSON Lines files directly in your browser.",
   },
+  alternates: { canonical: "/jsonl-viewer" },
 };
 
 export default function JsonlPage() {

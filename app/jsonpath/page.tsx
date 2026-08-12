@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     title: "JSONPath Tester | Devure JSON",
     description: "Interactive JSONPath playground — query JSON in your browser.",
   },
+  alternates: { canonical: "/jsonpath" },
 };
 
 export default function JsonPathPage() {

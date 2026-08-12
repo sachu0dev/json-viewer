@@ -2,6 +2,14 @@
   "name": "json-viewer",
   "version": "0.1.0",
   "private": true,
+  "description": "A free, local-first JSON viewer, formatter, differ, JSONPath playground, schema validator, JWT decoder, and JSON-to-code converter — all in the browser, nothing uploaded.",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Sushil Kumar <https://devure.in>",
+  "homepage": "https://github.com/sachu0dev/json-viewer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sachu0dev/json-viewer.git"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,6 +21,8 @@
     "@tanstack/react-virtual": "^3.14.8",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "jsonpath-plus": "^10.4.0",
     "next": "16.2.12",
     "react": "19.2.4",

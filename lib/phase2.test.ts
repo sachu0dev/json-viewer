@@ -22,6 +22,17 @@ test("executeJsonPath queries JSON objects correctly", () => {
   assert.equal(res2.results[1].value, "Bob");
 });
 
+test("executeJsonPath caps results at 500 and reports truncation without an off-by-one", () => {
+  const doc = { items: Array.from({ length: 501 }, (_, i) => i) };
+  const res = executeJsonPath(doc, "$.items[*]");
+  assert.equal(res.results.length, 500);
+  assert.equal(res.truncated, true, "501 matches should report truncated");
+
+  const exact = executeJsonPath({ items: Array.from({ length: 500 }, (_, i) => i) }, "$.items[*]");
+  assert.equal(exact.results.length, 500);
+  assert.equal(exact.truncated, false, "exactly 500 matches must not be flagged as truncated");
+});
+
 test("repairJson fixes trailing commas, unquoted keys, single quotes, and Python literals", () => {
   const malformed = `{
     'name': 'Alice',
