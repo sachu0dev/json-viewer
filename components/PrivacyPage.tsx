@@ -16,6 +16,12 @@ const ANALYTICS_EVENTS: { name: string; whatItRecords: string }[] = [
   { name: "share_link_opened", whatItRecords: "length of the incoming URL fragment" },
   { name: "compare_started", whatItRecords: "nothing beyond the event firing" },
   { name: "compare_completed", whatItRecords: "count of changed rows in the diff" },
+  { name: "schema_validated", whatItRecords: "which JSON Schema draft, whether it passed, count of errors" },
+  { name: "jwt_decoded", whatItRecords: "whether the token decoded successfully — never the token itself" },
+  { name: "api_response_parsed", whatItRecords: "detected body kind (json/html/xml/text), the HTTP status code" },
+  { name: "jsonl_processed", whatItRecords: "total record count, valid record count" },
+  { name: "jsonpath_query_run", whatItRecords: "count of matches, whether it errored — never the expression or results" },
+  { name: "converted", whatItRecords: "which conversion target (e.g. \"TypeScript\"), its category (code/data)" },
 ];
 
 const LOCAL_STORAGE_ITEMS: { what: string; where: string }[] = [

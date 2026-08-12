@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseHttpResponse, type ParsedHttpResponse } from "@/lib/api-response-parser";
 import { encodeShareFragment } from "@/lib/share";
+import { track } from "@/lib/analytics";
 import { useTheme } from "@/hooks/useTheme";
 import { ToolShell } from "./ToolShell";
 import { ToolIntro } from "./ToolIntro";
@@ -71,6 +72,13 @@ export function ApiResponsePlayground() {
 
   const parsed: ParsedHttpResponse = useMemo(() => parseHttpResponse(rawInput), [rawInput]);
 
+  const lastTrackedInput = useRef<string | null>(null);
+  useEffect(() => {
+    if (!rawInput.trim() || rawInput === lastTrackedInput.current || parsed.error) return;
+    lastTrackedInput.current = rawInput;
+    track("api_response_parsed", { body_kind: parsed.bodyKind, status_code: parsed.statusCode });
+  }, [rawInput, parsed.bodyKind, parsed.statusCode, parsed.error]);
+
   const getStatusColor = (code: number) => {
     if (code >= 200 && code < 300) return { bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.3)", fg: "#10b981" };
     if (code >= 300 && code < 400) return { bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.3)", fg: "#f59e0b" };
@@ -80,6 +88,7 @@ export function ApiResponsePlayground() {
 
   const handleOpenInTree = () => {
     if (parsed.isJson && parsed.body) {
+      track("feature_used", { feature: "open_in_viewer" });
       encodeShareFragment(parsed.body).then((fragment) => {
         window.open(`/#z=${fragment}`, "_blank", "noopener");
       });
@@ -88,6 +97,7 @@ export function ApiResponsePlayground() {
 
   const handleCopyBody = () => {
     navigator.clipboard.writeText(parsed.isJson ? JSON.stringify(parsed.parsedJson, null, 2) : parsed.body);
+    track("feature_used", { feature: "copy_output" });
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -103,7 +113,10 @@ export function ApiResponsePlayground() {
       onSelectCommand={(id) => {
         if (id.startsWith("sample-")) {
           const idx = Number(id.slice(7));
-          if (SAMPLE_RESPONSES[idx]) setRawInput(SAMPLE_RESPONSES[idx].raw);
+          if (SAMPLE_RESPONSES[idx]) {
+            track("feature_used", { feature: "load_sample" });
+            setRawInput(SAMPLE_RESPONSES[idx].raw);
+          }
         }
       }}
     >
@@ -147,7 +160,10 @@ export function ApiResponsePlayground() {
             {SAMPLE_RESPONSES.map((s, idx) => (
               <button
                 key={idx}
-                onClick={() => setRawInput(s.raw)}
+                onClick={() => {
+                  track("feature_used", { feature: "load_sample" });
+                  setRawInput(s.raw);
+                }}
                 className="rounded-full border px-2.5 py-1 text-[11px] font-mono transition-all hover:scale-105"
                 style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bg, color: theme.colors.fg }}
               >

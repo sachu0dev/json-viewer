@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { EXAMPLE_QUERIES, executeJsonPath } from "@/lib/jsonpath";
 import { parseTolerantJSON } from "@/lib/json-parser";
 import { listQueryHistory, recordQuery, clearQueryHistory } from "@/lib/jsonpath-history";
+import { track } from "@/lib/analytics";
 import type { JsonValue } from "@/lib/json-document";
 import { useTheme } from "@/hooks/useTheme";
 import { ToolShell } from "./ToolShell";
@@ -100,6 +101,17 @@ export function JsonPathPlayground({ initialJson }: Props) {
     }
   }, [queryResult, debouncedExpression]);
 
+  // Already debounced (debouncedExpression, 200ms), so this tracks once per
+  // settled query rather than per keystroke. Never the expression or result
+  // values themselves — just whether it ran and how many matches it found.
+  useEffect(() => {
+    if (!queryResult) return;
+    track("jsonpath_query_run", {
+      result_count: queryResult.results.length,
+      has_error: Boolean(queryResult.error),
+    });
+  }, [queryResult]);
+
   const resultCount = queryResult?.results.length ?? 0;
 
   const presetSlot = initialJson ? (
@@ -129,6 +141,7 @@ export function JsonPathPlayground({ initialJson }: Props) {
             .confirm({ title: "Clear query history", message: "Remove all saved JSONPath queries? This can't be undone.", confirmLabel: "Clear", danger: true })
             .then((ok) => {
               if (ok) {
+                track("feature_used", { feature: "clear_query_history" });
                 clearQueryHistory();
                 setHistory([]);
               }
@@ -218,7 +231,10 @@ export function JsonPathPlayground({ initialJson }: Props) {
               {EXAMPLE_QUERIES.map((q) => (
                 <button
                   key={q.query}
-                  onClick={() => setExpression(q.query)}
+                  onClick={() => {
+                    track("feature_used", { feature: "load_example_query" });
+                    setExpression(q.query);
+                  }}
                   className="rounded px-2.5 py-1 font-mono text-[11px] border transition-all hover:scale-105"
                   style={{ backgroundColor: theme.colors.panel, borderColor: theme.colors.border, color: theme.colors.fg }}
                   title={q.label}

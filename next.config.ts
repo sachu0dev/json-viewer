@@ -28,10 +28,15 @@ const nextConfig: NextConfig = {
             // CSP has no nonce mechanism for inline style *attributes* (only
             // for <style> blocks) — removing it would need a full rewrite of
             // theming to CSS custom properties, out of scope here.
+            // 'unsafe-eval' is re-added ONLY in `next dev` — React's dev-mode
+            // tooling (not React itself, and never in production; see its own
+            // console message) wants it for reconstructing stack traces across
+            // Turbopack's HMR boundaries. Real users only ever get the build
+            // below, which never includes it.
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://va.vercel-scripts.com",
+              `script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval' " : ""}https://www.googletagmanager.com https://va.vercel-scripts.com`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com",
               "font-src 'self' data:",

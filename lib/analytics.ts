@@ -32,7 +32,21 @@ export type Feature =
   | "minify"
   | "repair"
   | "jsonl_mode"
-  | "convert";
+  | "convert"
+  // Schema validator
+  | "infer_schema"
+  | "save_schema"
+  | "load_saved_schema"
+  | "regex_tester"
+  // JWT decoder / API inspector — generic across both, param carries which
+  | "load_sample"
+  | "copy_output"
+  | "open_in_viewer"
+  // JSONPath
+  | "load_example_query"
+  | "clear_query_history"
+  // JSONL viewer
+  | "jsonl_export";
 
 type AnalyticsEvent =
   // Activation: a document was successfully parsed and rendered.
@@ -49,7 +63,17 @@ type AnalyticsEvent =
   | { name: "share_link_opened"; params: { fragment_chars: number } }
   // Compare funnel: started without completed = users who tried diffing and bailed.
   | { name: "compare_started"; params?: Record<string, never> }
-  | { name: "compare_completed"; params: { changed_count: number } };
+  | { name: "compare_completed"; params: { changed_count: number } }
+  // Per-tool activation signals, same spirit as json_loaded above — did the
+  // core action of this tool succeed, and how big/shaped was the result.
+  // Never the schema/token/response/query content itself, only counts and
+  // enum labels describing it.
+  | { name: "schema_validated"; params: { draft: string; valid: boolean; error_count: number } }
+  | { name: "jwt_decoded"; params: { valid: boolean } }
+  | { name: "api_response_parsed"; params: { body_kind: string; status_code: number } }
+  | { name: "jsonl_processed"; params: { total_records: number; valid_records: number } }
+  | { name: "jsonpath_query_run"; params: { result_count: number; has_error: boolean } }
+  | { name: "converted"; params: { target: string; category: string } };
 
 export function track<E extends AnalyticsEvent>(name: E["name"], params?: E["params"]): void {
   if (typeof window === "undefined") return;

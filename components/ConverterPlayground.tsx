@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/hooks/useTheme";
+import { track } from "@/lib/analytics";
 import { CONVERTERS, CONVERTER_SLUGS, executeConverter } from "@/lib/converters/registry";
 import { tokenizeCode } from "@/lib/code-highlighter";
 import { ToolShell } from "./ToolShell";
@@ -59,12 +60,26 @@ export function ConverterPlayground({ slug, initialHashText }: Props) {
     };
   }, [slug, jsonText, options]);
 
+  // Tracks once per distinct (target, input) pair rather than per keystroke
+  // — live conversion re-runs on every change, but the useful signal is
+  // "did someone convert something with this target", not every re-render.
+  const lastTracked = useRef<string | null>(null);
+  useEffect(() => {
+    if (!jsonText.trim() || !outputCode) return;
+    const key = `${slug}:${jsonText}`;
+    if (key === lastTracked.current) return;
+    lastTracked.current = key;
+    track("converted", { target: config.targetName, category: config.category });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, jsonText, outputCode]);
+
   function handleOptionChange(key: string, value: unknown) {
     setOptions((prev) => ({ ...prev, [key]: value }));
   }
 
   function handleCopy() {
     navigator.clipboard.writeText(outputCode).then(() => {
+      track("feature_used", { feature: "copy_output" });
       showToast("Copied code to clipboard");
     });
   }
@@ -77,6 +92,7 @@ export function ConverterPlayground({ slug, initialHashText }: Props) {
     a.download = `output_${config.targetName.toLowerCase()}${config.fileExtension}`;
     a.click();
     URL.revokeObjectURL(url);
+    track("feature_used", { feature: "download" });
     showToast(`Downloaded output${config.fileExtension}`);
   }
 
@@ -100,6 +116,7 @@ export function ConverterPlayground({ slug, initialHashText }: Props) {
     if (id === "open-editor") {
       router.push("/");
     } else if (id === "load-sample") {
+      track("feature_used", { feature: "load_sample" });
       setJsonText(config.sampleJson);
     } else if (id === "copy-output") {
       handleCopy();
@@ -227,7 +244,10 @@ export function ConverterPlayground({ slug, initialHashText }: Props) {
                 JSON Input
               </label>
               <button
-                onClick={() => setJsonText(config.sampleJson)}
+                onClick={() => {
+                  track("feature_used", { feature: "load_sample" });
+                  setJsonText(config.sampleJson);
+                }}
                 className="text-[11px] hover:underline font-normal"
                 style={{ color: theme.colors.accent }}
               >

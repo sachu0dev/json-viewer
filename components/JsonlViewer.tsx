@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTheme } from "@/hooks/useTheme";
+import { track } from "@/lib/analytics";
 import type { JsonlSummary } from "@/lib/jsonl-parser";
 
 interface Props {
@@ -51,6 +52,7 @@ export function JsonlViewer({ summary, onExitJsonl }: Props) {
   }
 
   function handleExport(validOnly: boolean) {
+    track("feature_used", { feature: "jsonl_export" });
     const toExport = validOnly
       ? summary.records.filter((r) => r.isValid)
       : summary.records;

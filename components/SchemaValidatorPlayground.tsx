@@ -9,6 +9,7 @@ import {
 } from "@/lib/schema-validator";
 import { listSavedSchemas, saveSchema, deleteSchema, type SavedSchema } from "@/lib/saved-schemas";
 import { decodeShareFragment } from "@/lib/share";
+import { track } from "@/lib/analytics";
 import { useTheme } from "@/hooks/useTheme";
 import { ToolShell } from "./ToolShell";
 import { ToolIntro } from "./ToolIntro";
@@ -165,6 +166,22 @@ export function SchemaValidatorPlayground() {
     return validateJsonSchema(debouncedData, debouncedSchema, draftVersion);
   }, [debouncedData, debouncedSchema, draftVersion]);
 
+  // Debounced already (see useDebounced above), so this fires once per
+  // settled validation run rather than on every keystroke.
+  useEffect(() => {
+    if (!result) return;
+    track("schema_validated", {
+      draft: result.draftUsed ?? draftVersion,
+      valid: result.valid,
+      error_count: result.errors.length,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
+
+  useEffect(() => {
+    if (regexOpen) track("feature_used", { feature: "regex_tester" });
+  }, [regexOpen]);
+
   const isPending = dataText !== debouncedData || schemaText !== debouncedSchema;
 
   const regexResult = useMemo(() => {
@@ -192,6 +209,7 @@ export function SchemaValidatorPlayground() {
   };
 
   const handleInferSchema = () => {
+    track("feature_used", { feature: "infer_schema" });
     const { schema, error } = inferSchemaFromJson(dataText);
     if (schema) setSchemaText(JSON.stringify(schema, null, 2));
     else if (error) setSchemaText(`// Could not infer a schema: ${error}`);
@@ -206,13 +224,17 @@ export function SchemaValidatorPlayground() {
       confirmLabel: "Save",
     });
     if (name === null) return;
+    track("feature_used", { feature: "save_schema" });
     saveSchema(name, schemaText);
     setSavedSchemas(listSavedSchemas());
   };
 
   const handleLoadSaved = (id: string) => {
     const entry = savedSchemas.find((s) => s.id === id);
-    if (entry) setSchemaText(entry.schemaText);
+    if (entry) {
+      track("feature_used", { feature: "load_saved_schema" });
+      setSchemaText(entry.schemaText);
+    }
   };
 
   const handleDeleteSaved = async (id: string, name: string) => {

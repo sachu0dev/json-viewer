@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseJwt, type DecodedJwt } from "@/lib/jwt";
 import { encodeShareFragment } from "@/lib/share";
+import { track } from "@/lib/analytics";
 import { useTheme } from "@/hooks/useTheme";
 import { ToolShell } from "./ToolShell";
 import { ToolIntro } from "./ToolIntro";
@@ -60,14 +61,26 @@ export function JwtDecoderPlayground() {
 
   const decoded: DecodedJwt = useMemo(() => parseJwt(tokenInput), [tokenInput]);
 
+  // Tracks once per distinct token (not per keystroke) — a full JWT is
+  // normally pasted in a single change event, so this doesn't need its own
+  // debounce plumbing to avoid spamming events.
+  const lastTrackedToken = useRef<string | null>(null);
+  useEffect(() => {
+    if (!tokenInput.trim() || tokenInput === lastTrackedToken.current) return;
+    lastTrackedToken.current = tokenInput;
+    track("jwt_decoded", { valid: decoded.valid });
+  }, [tokenInput, decoded.valid]);
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
+    track("feature_used", { feature: "copy_output" });
     setCopiedField(label);
     setTimeout(() => setCopiedField(null), 1500);
   };
 
   const handleOpenPayloadInViewer = () => {
     if (!decoded.payload) return;
+    track("feature_used", { feature: "open_in_viewer" });
     encodeShareFragment(JSON.stringify(decoded.payload, null, 2)).then((fragment) => {
       window.open(`/#z=${fragment}`, "_blank", "noopener");
     });
@@ -87,7 +100,10 @@ export function JwtDecoderPlayground() {
       onSelectCommand={(id) => {
         if (id.startsWith("sample-")) {
           const idx = Number(id.slice(7));
-          if (SAMPLE_TOKENS[idx]) setTokenInput(SAMPLE_TOKENS[idx].token);
+          if (SAMPLE_TOKENS[idx]) {
+            track("feature_used", { feature: "load_sample" });
+            setTokenInput(SAMPLE_TOKENS[idx].token);
+          }
         }
       }}
     >
@@ -131,7 +147,10 @@ export function JwtDecoderPlayground() {
             {SAMPLE_TOKENS.map((s, idx) => (
               <button
                 key={idx}
-                onClick={() => setTokenInput(s.token)}
+                onClick={() => {
+                  track("feature_used", { feature: "load_sample" });
+                  setTokenInput(s.token);
+                }}
                 className="rounded-full border px-2.5 py-1 text-[11px] font-mono transition-all hover:scale-105"
                 style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bg, color: theme.colors.fg }}
               >

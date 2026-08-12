@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { parseJsonl, type JsonlSummary } from "@/lib/jsonl-parser";
+import { track } from "@/lib/analytics";
 import { JsonlViewer } from "@/components/JsonlViewer";
 
 const SAMPLE_JSONL = `{"id": 1, "user": "Alice", "status": "active"}
@@ -18,7 +19,9 @@ export function JsonlPageClient() {
   const [active, setActive] = useState(false);
 
   function handleProcess() {
-    setSummary(parseJsonl(inputText));
+    const result = parseJsonl(inputText);
+    track("jsonl_processed", { total_records: result.totalRecords, valid_records: result.validRecords });
+    setSummary(result);
   }
 
   return (
