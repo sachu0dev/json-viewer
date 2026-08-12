@@ -11,7 +11,7 @@ import { SideBySideDiff } from "@/components/SideBySideDiff";
 import { useJsonDocument } from "@/hooks/useJsonDocument";
 import { useRecentFiles } from "@/hooks/useRecentFiles";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
-import { decodeShareFragment, encodeShareFragment } from "@/lib/share";
+import { decodeLegacyGzipFragment, decodeShareFragment, encodeShareFragment } from "@/lib/share";
 import { PORTFOLIO_URL, GITHUB_URL, TWITTER_URL, LINKEDIN_URL } from "@/lib/site";
 
 function tryAutoFormat(text: string): string {
@@ -121,11 +121,26 @@ export function ViewerAppContent({
   );
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash.startsWith("#d=")) return;
-    decodeShareFragment(hash.slice(3))
-      .then(openText)
-      .catch(() => {});
+    function loadFromHash() {
+      const hash = window.location.hash;
+      // `#z=` is the current (deflate-raw) format; `#d=` is the older gzip one,
+      // still decoded so links shared before the switch keep working.
+      const decode = hash.startsWith("#z=")
+        ? decodeShareFragment
+        : hash.startsWith("#d=")
+          ? decodeLegacyGzipFragment
+          : null;
+      if (!decode) return;
+      decode(hash.slice(3))
+        .then(openText)
+        .catch(() => {});
+    }
+    loadFromHash();
+    // Pasting a share link into the address bar of a tab already on the app is
+    // a same-document navigation — it fires hashchange and never remounts, so
+    // without this the link silently does nothing.
+    window.addEventListener("hashchange", loadFromHash);
+    return () => window.removeEventListener("hashchange", loadFromHash);
   }, [openText]);
 
   const handleShare = useCallback(async () => {
@@ -133,7 +148,7 @@ export function ViewerAppContent({
     if (!text) return;
     try {
       const fragment = await encodeShareFragment(text);
-      const url = `${window.location.origin}${window.location.pathname}#d=${fragment}`;
+      const url = `${window.location.origin}${window.location.pathname}#z=${fragment}`;
       await navigator.clipboard.writeText(url);
       setShareStatus("copied");
     } catch {
