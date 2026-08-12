@@ -195,7 +195,7 @@ export function SettingsModal({ onClose, onSettingsChange }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label="Settings"
-        className="flex h-[540px] w-full max-w-2xl overflow-hidden rounded-xl shadow-2xl"
+        className="flex h-135 w-full max-w-2xl overflow-hidden rounded-xl shadow-2xl"
         style={{
           backgroundColor: theme.colors.bg,
           border: `1px solid ${theme.colors.border}`,

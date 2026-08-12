@@ -189,7 +189,7 @@ export function repairJson(text: string): RepairResult {
 
   // 8. Try to parse the repaired text with tolerant parse
   const res = parseTolerantJSON(current);
-  let isValid = Boolean(res.value !== null);
+  const isValid = Boolean(res.value !== null);
 
   // If valid, pretty-print to standard JSON format
   if (isValid && res.value !== null) {

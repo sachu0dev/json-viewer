@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTheme } from "@/hooks/useTheme";
-import type { JsonlSummary, JsonlRecord } from "@/lib/jsonl-parser";
+import type { JsonlSummary } from "@/lib/jsonl-parser";
 
 interface Props {
   summary: JsonlSummary;

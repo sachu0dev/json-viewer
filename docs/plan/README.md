@@ -8,7 +8,7 @@ Index for the phase-wise build plan. [VISION.md](./VISION.md) is the full, unabr
 |---|---|---|
 | Phase 1 — Foundation | [phase-1-foundation.md](./phase-1-foundation.md) | 100% — complete & verified |
 | Phase 2 — Professional Toolkit | [phase-2-professional-toolkit.md](./phase-2-professional-toolkit.md) | 100% — minifier, settings, jsonpath, adv-search, repair, jsonl complete |
-| Phase 3 — Conversion Platform | [phase-3-conversion-platform.md](./phase-3-conversion-platform.md) | 0% — not started |
+| Phase 3 — Conversion Platform | [phase-3-conversion-platform.md](./phase-3-conversion-platform.md) | 100% — 13 code & data converters statically pre-rendered |
 | Phase 4 — Advanced Dev Tools | [phase-4-advanced-dev-tools.md](./phase-4-advanced-dev-tools.md) | 0% — not started |
 | Phase 5 — Privacy & Productivity | [phase-5-privacy-productivity.md](./phase-5-privacy-productivity.md) | ~45% — share/history/palette/settings/minifier done |
 | Phase 6 — Browser Extension | [phase-6-browser-extension.md](./phase-6-browser-extension.md) | 0% — not started |

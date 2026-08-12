@@ -9,20 +9,23 @@ export function JsonPathPageClient() {
   const [initialJson, setInitialJson] = useState<string | undefined>(undefined);
   const [ready, setReady] = useState(false);
 
-  // Read hash on client-side — may contain JSON from "Open in JSONPath" button
   useEffect(() => {
+    let active = true;
     const hash = window.location.hash.slice(1);
     if (hash) {
-      (async () => {
-        try {
-          const decoded = await decodeShareFragment(hash);
-          if (decoded) setInitialJson(decoded);
-        } catch {
-          // Ignore malformed hash — start blank
-        }
-      })();
+      decodeShareFragment(hash)
+        .then((decoded) => {
+          if (active && decoded) setInitialJson(decoded);
+        })
+        .catch(() => {});
     }
-    setReady(true);
+    const t = setTimeout(() => {
+      if (active) setReady(true);
+    }, 0);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
   }, []);
 
   return (

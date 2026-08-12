@@ -20,10 +20,8 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <ToolPage heading="Free JSON Viewer, Formatter & Parser">
-        Paste JSON to instantly format, validate, and explore it — with syntax highlighting,
-        search, and a collapsible tree view. Compare two JSON documents or open large multi-MB
-        files without freezing your browser. Nothing you paste ever leaves your device.
+      <ToolPage heading="All-in-One Privacy-First Developer Workspace">
+        Explore, format, and edit JSON with interactive Tree and Split views. Query with JSONPath, compare side-by-side diffs, auto-repair syntax errors, minify, process JSONL streams, and convert JSON to TypeScript, Python, Go, Rust, Java, C#, Swift, CSV, YAML, XML & SQL. 100% local-first — your data never leaves your browser.
       </ToolPage>
     </>
   );

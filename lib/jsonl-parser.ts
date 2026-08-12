@@ -7,7 +7,6 @@
  */
 
 import type { JsonValue } from "./json-document.ts";
-import { parseTolerantJSON } from "./json-parser.ts";
 
 export interface JsonlRecord {
   lineNumber: number;

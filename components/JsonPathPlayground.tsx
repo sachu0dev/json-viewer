@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { EXAMPLE_QUERIES, executeJsonPath, type JsonPathQueryResult } from "@/lib/jsonpath";
+import { useMemo, useRef, useState } from "react";
+import { EXAMPLE_QUERIES, executeJsonPath } from "@/lib/jsonpath";
 import { parseTolerantJSON } from "@/lib/json-parser";
 import type { JsonValue } from "@/lib/json-document";
 
@@ -29,43 +29,26 @@ interface Props {
 
 export function JsonPathPlayground({ initialJson }: Props) {
   const [jsonText, setJsonText] = useState(initialJson ?? "");
-  const [jsonError, setJsonError] = useState<string | null>(null);
-  const [parsedDoc, setParsedDoc] = useState<JsonValue | null>(null);
-
   const [expression, setExpression] = useState("$.*");
-  const [queryResult, setQueryResult] = useState<JsonPathQueryResult | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
   const queryInputRef = useRef<HTMLInputElement>(null);
 
-  // Parse JSON whenever text changes
-  useEffect(() => {
+  // Derive parsed JSON document and parse errors
+  const { parsedDoc, jsonError } = useMemo(() => {
     if (!jsonText.trim()) {
-      setParsedDoc(null);
-      setJsonError(null);
-      setQueryResult(null);
-      return;
+      return { parsedDoc: null, jsonError: null };
     }
     try {
       const result = parseTolerantJSON(jsonText);
-      setParsedDoc(result.value);
-      setJsonError(null);
+      return { parsedDoc: result.value, jsonError: null };
     } catch {
-      setParsedDoc(null);
-      setJsonError("Invalid JSON — fix the input before querying.");
+      return { parsedDoc: null, jsonError: "Invalid JSON — fix the input before querying." };
     }
   }, [jsonText]);
 
-  // Re-run query when expression or doc changes
-  useEffect(() => {
-    if (!parsedDoc || !expression.trim()) { setQueryResult(null); return; }
-    setIsRunning(true);
-    // Tiny timeout to let React render the loading state
-    const t = setTimeout(() => {
-      const result = executeJsonPath(parsedDoc, expression);
-      setQueryResult(result);
-      setIsRunning(false);
-    }, 0);
-    return () => clearTimeout(t);
+  // Derive JSONPath query result
+  const queryResult = useMemo(() => {
+    if (!parsedDoc || !expression.trim()) return null;
+    return executeJsonPath(parsedDoc, expression);
   }, [parsedDoc, expression]);
 
   const resultCount = queryResult?.results.length ?? 0;
@@ -185,17 +168,13 @@ export function JsonPathPlayground({ initialJson }: Props) {
           </div>
         )}
 
-        {isRunning && (
-          <div className="rounded-lg p-4 text-sm opacity-50">Evaluating…</div>
-        )}
-
-        {queryResult && !queryResult.error && !isRunning && resultCount === 0 && (
+        {queryResult && !queryResult.error && resultCount === 0 && (
           <div className="rounded-lg p-6 text-center text-sm opacity-40" style={{ border: "1px dashed rgba(255,255,255,0.15)" }}>
             No matches
           </div>
         )}
 
-        {queryResult && !queryResult.error && !isRunning && resultCount > 0 && (
+        {queryResult && !queryResult.error && resultCount > 0 && (
           <div className="overflow-hidden rounded-lg" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
             {queryResult.results.map((r, i) => (
               <div

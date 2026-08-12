@@ -392,7 +392,7 @@ export function JsonTree({
       {contextMenu && (
         <div
           ref={menuRef}
-          className="fixed z-50 min-w-[190px] overflow-hidden rounded-lg shadow-2xl"
+          className="fixed z-50 min-w-47.5 overflow-hidden rounded-lg shadow-2xl"
           style={{
             top: contextMenu.y,
             left: contextMenu.x,

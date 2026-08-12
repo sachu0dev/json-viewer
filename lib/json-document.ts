@@ -487,9 +487,9 @@ export function updateNodeValueAtPath(root: JsonValue, path: string, newValueRaw
   if (segments.length === 0) return parseRawValue(newValueRaw);
 
   const cloned = deepClone(root);
-  let current: any = cloned;
+  let current: Record<string | number, unknown> = cloned as Record<string | number, unknown>;
   for (let i = 0; i < segments.length - 1; i++) {
-    current = current[segments[i]];
+    current = current[segments[i]] as Record<string | number, unknown>;
     if (current === undefined || current === null) return root;
   }
 
@@ -506,9 +506,9 @@ export function renameNodeKeyAtPath(root: JsonValue, path: string, newKeyName: s
   if (segments.length === 0) return root;
 
   const cloned = deepClone(root);
-  let current: any = cloned;
+  let current: Record<string | number, unknown> = cloned as Record<string | number, unknown>;
   for (let i = 0; i < segments.length - 1; i++) {
-    current = current[segments[i]];
+    current = current[segments[i]] as Record<string | number, unknown>;
     if (current === undefined || current === null) return root;
   }
 
@@ -521,9 +521,9 @@ export function renameNodeKeyAtPath(root: JsonValue, path: string, newKeyName: s
   const updated: Record<string, JsonValue> = {};
   for (const k of Object.keys(current)) {
     if (k === oldKey) {
-      updated[trimmedKey] = current[oldKey];
+      updated[trimmedKey] = current[oldKey] as JsonValue;
     } else {
-      updated[k] = current[k];
+      updated[k] = current[k] as JsonValue;
     }
   }
 
@@ -539,9 +539,9 @@ export function deleteNodeAtPath(root: JsonValue, path: string): JsonValue {
   if (segments.length === 0) return null;
 
   const cloned = deepClone(root);
-  let current: any = cloned;
+  let current: Record<string | number, unknown> = cloned as Record<string | number, unknown>;
   for (let i = 0; i < segments.length - 1; i++) {
-    current = current[segments[i]];
+    current = current[segments[i]] as Record<string | number, unknown>;
     if (current === undefined || current === null) return root;
   }
 

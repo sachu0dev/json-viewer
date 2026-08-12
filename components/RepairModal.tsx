@@ -64,7 +64,7 @@ export function RepairModal({ originalText, repairResult, onApprove, onClose }: 
         role="dialog"
         aria-modal="true"
         aria-label="Repair JSON Preview"
-        className="flex h-[600px] w-full max-w-4xl flex-col overflow-hidden rounded-xl shadow-2xl"
+        className="flex h-150 w-full max-w-4xl flex-col overflow-hidden rounded-xl shadow-2xl"
         style={{
           backgroundColor: theme.colors.bg,
           border: `1px solid ${theme.colors.border}`,

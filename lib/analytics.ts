@@ -31,7 +31,8 @@ export type Feature =
   | "tree_expand"
   | "minify"
   | "repair"
-  | "jsonl_mode";
+  | "jsonl_mode"
+  | "convert";
 
 type AnalyticsEvent =
   // Activation: a document was successfully parsed and rendered.

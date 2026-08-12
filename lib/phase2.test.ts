@@ -62,16 +62,18 @@ test("path editing functions mutate document structures cleanly", async () => {
     settings: { theme: "dark" },
   };
 
+  type TestDoc = { users: { name: string }[]; settings: { themeId?: string; theme?: string } };
+
   // Update value
-  const doc1 = updateNodeValueAtPath(doc, "$.users[0].name", "Alice Wonder") as any;
+  const doc1 = updateNodeValueAtPath(doc, "$.users[0].name", "Alice Wonder") as unknown as TestDoc;
   assert.equal(doc1.users[0].name, "Alice Wonder");
 
   // Rename key
-  const doc2 = renameNodeKeyAtPath(doc, "$.settings.theme", "themeId") as any;
+  const doc2 = renameNodeKeyAtPath(doc, "$.settings.theme", "themeId") as unknown as TestDoc;
   assert.equal(doc2.settings.themeId, "dark");
   assert.equal(doc2.settings.theme, undefined);
 
   // Delete node
-  const doc3 = deleteNodeAtPath(doc, "$.users[1]") as any;
+  const doc3 = deleteNodeAtPath(doc, "$.users[1]") as unknown as TestDoc;
   assert.equal(doc3.users.length, 1);
 });

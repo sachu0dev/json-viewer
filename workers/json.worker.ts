@@ -14,6 +14,8 @@ import {
   type SearchOptions,
 } from "../lib/json-document";
 import { getDynamicExpandPaths, parseTolerantJSON, type ParseMode } from "../lib/json-parser";
+import { executeJsonPath } from "../lib/jsonpath";
+import { parseJsonl } from "../lib/jsonl-parser";
 
 let doc: JsonValue | null = null;
 let compareDoc: JsonValue | null = null;
@@ -207,14 +209,12 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
       respond({ type: "jsonpath-results", result: { results: [], executionMs: 0, error: "No document loaded" } });
       return;
     }
-    const { executeJsonPath } = require("../lib/jsonpath");
     const result = executeJsonPath(doc, message.expression);
     respond({ type: "jsonpath-results", result });
     return;
   }
 
   if (message.type === "parse-jsonl") {
-    const { parseJsonl } = require("../lib/jsonl-parser");
     const summary = parseJsonl(message.text);
     respond({ type: "jsonl-parsed", summary });
     return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { findMatchingBracket } from "@/lib/bracket-matcher";
 import { highlightJsonToTokens } from "@/lib/json-highlighter";
 import type { Theme } from "@/lib/themes";
@@ -31,7 +31,7 @@ export function JsonEditorArea({
   }, [value, cursorPos]);
 
   const highlightedHtml = useMemo(() => {
-    let html = highlightJsonToTokens(value, theme.colors, searchQuery);
+    const html = highlightJsonToTokens(value, theme.colors, searchQuery);
 
     // If matching brackets are found, inject outline styling into the pre element html
     if (bracketPair) {

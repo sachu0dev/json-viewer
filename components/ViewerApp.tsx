@@ -89,7 +89,7 @@ export function ViewerAppContent({
   const isDraggingRef = useRef(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [appSettings, setAppSettings] = useState<AppSettings>(() => loadSettings());
+  const [, setAppSettings] = useState<AppSettings>(() => loadSettings());
   const [repairModalOpen, setRepairModalOpen] = useState(false);
   const [repairResult, setRepairResult] = useState<RepairResult | null>(null);
   const [isJsonlMode, setIsJsonlMode] = useState(false);
@@ -515,11 +515,22 @@ export function ViewerAppContent({
     }
   }
 
+  function handleConvertTo(slug: string) {
+    track("feature_used", { feature: "convert" });
+    stringify("pretty").then((text) => {
+      const fragment = encodeShareFragment(text);
+      window.open(`/${slug}#${fragment}`, "_blank", "noopener");
+    });
+  }
+
   function handleSelectCommand(commandId: string) {
     if (commandId === "minify-json") {
       handleMinify();
     } else if (commandId === "repair-json") {
       handleRepair();
+    } else if (commandId.startsWith("convert-to-")) {
+      const slug = commandId.slice(11);
+      handleConvertTo(slug);
     } else if (commandId === "toggle-jsonl") {
       track("feature_used", { feature: "jsonl_mode" });
       setIsJsonlMode((m) => !m);
@@ -594,6 +605,19 @@ export function ViewerAppContent({
         { id: "download", label: "Download JSON", shortcut: `${mod}S` },
         { id: "share", label: "Share (copy link, no server)" },
         { id: "open-jsonpath", label: "Query with JSONPath…" },
+        { id: "convert-to-json-to-typescript", label: "Convert to TypeScript" },
+        { id: "convert-to-json-to-python", label: "Convert to Python" },
+        { id: "convert-to-json-to-go", label: "Convert to Go" },
+        { id: "convert-to-json-to-rust", label: "Convert to Rust" },
+        { id: "convert-to-json-to-java", label: "Convert to Java" },
+        { id: "convert-to-json-to-csharp", label: "Convert to C#" },
+        { id: "convert-to-json-to-swift", label: "Convert to Swift" },
+        { id: "convert-to-json-to-javascript", label: "Convert to JavaScript" },
+        { id: "convert-to-json-to-csv", label: "Convert to CSV" },
+        { id: "convert-to-json-to-yaml", label: "Convert to YAML" },
+        { id: "convert-to-json-to-xml", label: "Convert to XML" },
+        { id: "convert-to-json-to-toml", label: "Convert to TOML" },
+        { id: "convert-to-json-to-sql", label: "Convert to SQL" },
         { id: "toggle-jsonl", label: isJsonlMode ? "Exit JSONL mode" : "Switch to JSONL viewer" },
         { id: "compare", label: "Compare side-by-side with another document", shortcut: `${mod}D` },
         { id: "expand-all", label: "Expand all nodes" },
@@ -628,7 +652,7 @@ export function ViewerAppContent({
     );
 
     return list;
-  }, [rows, themes, theme.id, viewLayout, mod]);
+  }, [rows, themes, theme.id, viewLayout, mod, error, isJsonlMode, stringParseError]);
 
   return (
     <div
@@ -836,6 +860,60 @@ export function ViewerAppContent({
               >
                 JSONPath…
               </button>
+
+              <select
+                onChange={(e) => {
+                  if (e.target.value) handleConvertTo(e.target.value);
+                  e.target.value = "";
+                }}
+                defaultValue=""
+                className="cursor-pointer bg-transparent px-2 py-1 text-xs outline-none transition-colors"
+                style={{ color: theme.colors.muted }}
+                aria-label="Convert JSON to code or data format"
+              >
+                <option value="" disabled style={{ backgroundColor: theme.colors.panel, color: theme.colors.muted }}>
+                  Convert to…
+                </option>
+                <option value="json-to-typescript" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  TypeScript
+                </option>
+                <option value="json-to-python" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  Python
+                </option>
+                <option value="json-to-go" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  Go
+                </option>
+                <option value="json-to-rust" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  Rust
+                </option>
+                <option value="json-to-java" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  Java
+                </option>
+                <option value="json-to-csharp" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  C#
+                </option>
+                <option value="json-to-swift" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  Swift
+                </option>
+                <option value="json-to-javascript" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  JavaScript
+                </option>
+                <option value="json-to-csv" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  CSV
+                </option>
+                <option value="json-to-yaml" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  YAML
+                </option>
+                <option value="json-to-xml" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  XML
+                </option>
+                <option value="json-to-toml" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  TOML
+                </option>
+                <option value="json-to-sql" style={{ backgroundColor: theme.colors.panel, color: theme.colors.fg }}>
+                  SQL
+                </option>
+              </select>
             </>
           )}
 
