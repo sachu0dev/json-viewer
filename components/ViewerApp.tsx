@@ -12,6 +12,7 @@ import { useJsonDocument } from "@/hooks/useJsonDocument";
 import { useRecentFiles } from "@/hooks/useRecentFiles";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { decodeLegacyGzipFragment, decodeShareFragment, encodeShareFragment } from "@/lib/share";
+import { track, type LoadSource } from "@/lib/analytics";
 import { PORTFOLIO_URL, GITHUB_URL, TWITTER_URL, LINKEDIN_URL } from "@/lib/site";
 
 function tryAutoFormat(text: string): string {
@@ -68,6 +69,15 @@ export function ViewerAppContent({
     onActiveChange?.(Boolean(rows));
   }, [rows, onActiveChange]);
 
+  // Completing the compare funnel: started -> a second document actually landed
+  // and produced a diff. compare_started without this is the abandon signal.
+  useEffect(() => {
+    if (!sideBySideRows) return;
+    track("compare_completed", {
+      changed_count: sideBySideRows.filter((r) => r.status !== "same").length,
+    });
+  }, [sideBySideRows]);
+
   const pendingSaveRef = useRef<string | null>(null);
   useEffect(() => {
     if (rows && !isLoading && !error && pendingSaveRef.current !== null) {
@@ -75,6 +85,33 @@ export function ViewerAppContent({
       pendingSaveRef.current = null;
     }
   }, [rows, isLoading, error, record]);
+
+  // Set when a document enters from outside the editor; consumed once the
+  // worker reports back, so the outcome (activated vs. bounced off a parse
+  // error) is attributed to how the document arrived.
+  const pendingLoadRef = useRef<{ source: LoadSource; size: number } | null>(null);
+  useEffect(() => {
+    const pending = pendingLoadRef.current;
+    if (!pending || isLoading) return;
+    // `error` first: rows now survive a failed reparse (stale-while-revalidate),
+    // so a non-null `rows` no longer implies the latest parse succeeded.
+    if (error) {
+      pendingLoadRef.current = null;
+      track("json_parse_failed", {
+        source: pending.source,
+        size_bytes: pending.size,
+        error_line: error.line,
+      });
+    } else if (rows) {
+      pendingLoadRef.current = null;
+      track("json_loaded", {
+        source: pending.source,
+        size_bytes: pending.size,
+        parse_mode: parseMode,
+        row_count: rows.length,
+      });
+    }
+  }, [rows, error, isLoading, parseMode]);
 
   const currentTextRef = useRef<string | null>(null);
   const editDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,10 +123,20 @@ export function ViewerAppContent({
 
   // Debounced so a full reparse doesn't run on every keystroke — instant
   // loads (paste/drop/open/recent-file) call loadText directly and skip this.
+  const hasTrackedEditRef = useRef(false);
   const handleEditorChange = useCallback(
     (text: string) => {
       setRawText(text);
       currentTextRef.current = text;
+      // Once per document, not per keystroke: editing fires every 300ms pause,
+      // and per-parse events here would swamp the funnel with transient
+      // mid-typing states that mean nothing. Deliberately no json_loaded /
+      // json_parse_failed for edits either — half-typed JSON is *expected* to
+      // be invalid, so counting it as failure would poison the friction metric.
+      if (!hasTrackedEditRef.current) {
+        hasTrackedEditRef.current = true;
+        track("document_edited", { size_bytes: text.length });
+      }
       if (editDebounceRef.current) clearTimeout(editDebounceRef.current);
       editDebounceRef.current = setTimeout(() => loadText(text), 300);
     },
@@ -98,10 +145,12 @@ export function ViewerAppContent({
   const [shareStatus, setShareStatus] = useState<"idle" | "copied" | "error">("idle");
 
   const openText = useCallback(
-    (text: string) => {
+    (text: string, source: LoadSource = "paste") => {
       const formatted = tryAutoFormat(text);
       pendingSaveRef.current = formatted;
       currentTextRef.current = formatted;
+      pendingLoadRef.current = { source, size: text.length };
+      hasTrackedEditRef.current = false;
       setRawText(formatted);
       setShareStatus("idle");
       loadText(formatted);
@@ -110,11 +159,11 @@ export function ViewerAppContent({
   );
 
   const handleIncomingText = useCallback(
-    (text: string) => {
+    (text: string, source: LoadSource = "paste") => {
       if (isComparingRef.current) {
         compare(text);
       } else {
-        openText(text);
+        openText(text, source);
       }
     },
     [compare, openText],
@@ -131,11 +180,17 @@ export function ViewerAppContent({
           ? decodeLegacyGzipFragment
           : null;
       if (!decode) return;
-      decode(hash.slice(3))
-        .then(openText)
+      const fragment = hash.slice(3);
+      // Fired here rather than after decode so an inbound share is counted even
+      // if the payload turns out to be corrupt — a truncated link that fails to
+      // open is exactly the kind of loss worth seeing in the funnel.
+      track("share_link_opened", { fragment_chars: fragment.length });
+      decode(fragment)
+        .then((text) => openText(text, "share_link"))
         .catch(() => {});
     }
     loadFromHash();
+
     // Pasting a share link into the address bar of a tab already on the app is
     // a same-document navigation — it fires hashchange and never remounts, so
     // without this the link silently does nothing.
@@ -151,6 +206,7 @@ export function ViewerAppContent({
       const url = `${window.location.origin}${window.location.pathname}#z=${fragment}`;
       await navigator.clipboard.writeText(url);
       setShareStatus("copied");
+      track("share_link_created", { size_bytes: text.length, fragment_chars: fragment.length });
     } catch {
       setShareStatus("error");
     }
@@ -189,13 +245,14 @@ export function ViewerAppContent({
     async (e: React.DragEvent) => {
       e.preventDefault();
       const file = e.dataTransfer.files[0];
-      if (file) handleIncomingText(await file.text());
+      if (file) handleIncomingText(await file.text(), "drop");
     },
     [handleIncomingText],
   );
 
   function startCompare() {
     setIsComparing(true);
+    track("compare_started");
   }
 
   function exitCompare() {
@@ -204,6 +261,7 @@ export function ViewerAppContent({
   }
 
   function handleFormatText() {
+    track("feature_used", { feature: "format" });
     stringify("pretty").then((formatted) => {
       setRawText(formatted);
       currentTextRef.current = formatted;
@@ -234,10 +292,12 @@ export function ViewerAppContent({
 
   function handleSelectCommand(commandId: string) {
     if (commandId === "copy-formatted") {
+      track("feature_used", { feature: "copy_formatted" });
       stringify("pretty")
         .then((text) => navigator.clipboard.writeText(text))
         .then(() => setToast("Copied formatted JSON"));
     } else if (commandId === "copy-minified") {
+      track("feature_used", { feature: "copy_minified" });
       stringify("compact")
         .then((text) => navigator.clipboard.writeText(text))
         .then(() => setToast("Copied minified JSON"));
@@ -248,11 +308,13 @@ export function ViewerAppContent({
     } else if (commandId === "compare") {
       startCompare();
     } else if (commandId === "toggle-layout") {
+      track("feature_used", { feature: "view_toggle" });
       setViewLayout((l) => (l === "split" ? "tree" : "split"));
     } else if (commandId === "clear-recent") {
       clearRecentFiles();
     } else if (commandId.startsWith("theme-")) {
       const targetThemeId = commandId.slice(6);
+      track("feature_used", { feature: "theme_change" });
       setThemeId(targetThemeId);
       const selected = themes.find((t) => t.id === targetThemeId);
       if (selected) setToast(`Theme changed to ${selected.name}`);
@@ -336,7 +398,10 @@ export function ViewerAppContent({
           {rows && !isComparing && (
             <div className="flex items-center rounded overflow-hidden border" style={{ borderColor: theme.colors.border }}>
               <button
-                onClick={() => setViewLayout("split")}
+                onClick={() => {
+                  track("feature_used", { feature: "view_toggle" });
+                  setViewLayout("split");
+                }}
                 className={`px-2.5 py-1 text-xs font-mono transition-colors ${viewLayout === "split" ? "font-bold" : ""}`}
                 style={{
                   backgroundColor: viewLayout === "split" ? theme.colors.active : "transparent",
@@ -346,7 +411,10 @@ export function ViewerAppContent({
                 Split View
               </button>
               <button
-                onClick={() => setViewLayout("tree")}
+                onClick={() => {
+                  track("feature_used", { feature: "view_toggle" });
+                  setViewLayout("tree");
+                }}
                 className={`px-2.5 py-1 text-xs font-mono transition-colors ${viewLayout === "tree" ? "font-bold" : ""}`}
                 style={{
                   backgroundColor: viewLayout === "tree" ? theme.colors.active : "transparent",
@@ -377,6 +445,7 @@ export function ViewerAppContent({
           <select
             value={theme.id}
             onChange={(e) => {
+              track("feature_used", { feature: "theme_change" });
               setThemeId(e.target.value);
               const selected = themes.find((t) => t.id === e.target.value);
               if (selected) setToast(`Theme: ${selected.name}`);
@@ -416,7 +485,10 @@ export function ViewerAppContent({
           )}
 
           <button
-            onClick={() => setPaletteOpen(true)}
+            onClick={() => {
+              track("feature_used", { feature: "command_palette" });
+              setPaletteOpen(true);
+            }}
             className="rounded px-2.5 py-1 font-mono text-xs font-semibold transition-colors hover:opacity-80"
             style={{
               backgroundColor: theme.colors.hover,
@@ -471,6 +543,9 @@ export function ViewerAppContent({
           activeMatchIndex={activeMatchIndex}
           activeMatchPath={revealTarget}
           onQueryChange={(q) => {
+            // Once per search session (fires again only after the box is
+            // cleared), so a 20-character query isn't 20 events.
+            if (q && !searchQuery) track("feature_used", { feature: "search" });
             setSearchQuery(q);
             search(q);
           }}
@@ -603,7 +678,11 @@ export function ViewerAppContent({
         )}
 
         {!error && !isLoading && !rows && (
-          <EmptyState recent={recent} onSelect={openText} onClear={clearRecentFiles} />
+          <EmptyState
+            recent={recent}
+            onSelect={(text) => openText(text, "recent")}
+            onClear={clearRecentFiles}
+          />
         )}
       </main>
 
