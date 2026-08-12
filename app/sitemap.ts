@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 import { CONVERTER_SLUGS } from "@/lib/converters/registry";
-
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+import { SITE_URL } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const coreRoutes = [
