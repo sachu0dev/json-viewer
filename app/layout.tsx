@@ -5,6 +5,8 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
+import { Providers } from "@/components/Providers";
+
 const GA_MEASUREMENT_ID = "G-FSD6QCXQDR";
 
 const websiteStructuredData = {
@@ -88,7 +90,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteStructuredData) }}
         />
-        {children}
+        <Providers>{children}</Providers>
         <Analytics />
         <SpeedInsights />
 

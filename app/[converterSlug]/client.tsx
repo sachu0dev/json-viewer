@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { ConverterPlayground } from "@/components/ConverterPlayground";
 import { decodeShareFragment } from "@/lib/share";
 
+import { ThemeProvider } from "@/hooks/useTheme";
+
 interface Props {
   slug: string;
 }
@@ -26,5 +28,9 @@ export function ConverterClientPage({ slug }: Props) {
     loadHash();
   }, []);
 
-  return <ConverterPlayground slug={slug} initialHashText={initialText} />;
+  return (
+    <ThemeProvider>
+      <ConverterPlayground slug={slug} initialHashText={initialText} />
+    </ThemeProvider>
+  );
 }
