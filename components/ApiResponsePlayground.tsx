@@ -5,6 +5,7 @@ import { parseHttpResponse, type ParsedHttpResponse } from "@/lib/api-response-p
 import { encodeShareFragment } from "@/lib/share";
 import { useTheme } from "@/hooks/useTheme";
 import { ToolShell } from "./ToolShell";
+import { ToolIntro } from "./ToolIntro";
 
 const SAMPLE_RESPONSES = [
   {
@@ -106,7 +107,16 @@ export function ApiResponsePlayground() {
         }
       }}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 h-full min-h-0 overflow-hidden">
+      <div className="flex h-full flex-col">
+        <ToolIntro heading="API Response Inspector" active={!isEmpty}>
+          Paste a raw HTTP response — status line, headers, and body, straight from{" "}
+          <span className="font-mono">curl -i</span> — and get it parsed into a readable status
+          pill, a searchable headers table, cookies broken into their attributes, and a
+          pretty-printed body. Auto-detects whether the body is JSON, HTML, XML, or plain text,
+          and JSON bodies open directly in the main interactive tree view. Parsed entirely
+          client-side — the response text never leaves your browser.
+        </ToolIntro>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 min-h-0 flex-1 overflow-hidden">
         {/* Left Column: Raw Response Input - 5 Columns */}
         <div
           className="lg:col-span-5 flex flex-col border-b lg:border-b-0 lg:border-r min-h-0"
@@ -304,6 +314,7 @@ export function ApiResponsePlayground() {
             </>
           )}
         </div>
+      </div>
       </div>
     </ToolShell>
   );

@@ -1,6 +1,6 @@
 export const PORTFOLIO_URL = "https://devure.in";
 export const GITHUB_URL = "https://github.com/sachu0dev";
-export const TWITTER_URL = "https://twitter.com/sachu0dev";
+export const TWITTER_URL = "https://x.com/sachu0dev";
 export const LINKEDIN_URL = "https://linkedin.com/in/sachu0dev";
 
 export const SCHEMA_AUTHOR = {

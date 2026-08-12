@@ -687,13 +687,13 @@ export function ViewerAppContent({
     >
       {/* Top Header Bar */}
       <div
-        className="flex items-center justify-between border-b px-4 py-2"
+        className="flex flex-wrap items-center justify-between gap-y-1.5 border-b px-4 py-2"
         style={{
           borderColor: theme.colors.border,
           backgroundColor: theme.colors.panel,
         }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/"
             className="font-mono text-xs font-bold tracking-wider uppercase hover:opacity-80"
@@ -780,7 +780,7 @@ export function ViewerAppContent({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {rows && !isComparing && (
             <div className="flex items-center gap-1.5">
               {/* Format button group */}
@@ -862,7 +862,7 @@ export function ViewerAppContent({
               const selected = themes.find((t) => t.id === e.target.value);
               if (selected) setToast(`Theme: ${selected.name}`);
             }}
-            className="cursor-pointer bg-transparent px-2 py-1 text-xs outline-none transition-colors"
+            className="max-w-[90px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap bg-transparent px-2 py-1 text-xs outline-none transition-colors sm:max-w-none"
             style={{ color: theme.colors.muted }}
             aria-label="Select theme"
           >

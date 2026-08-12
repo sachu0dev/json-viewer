@@ -11,17 +11,27 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
           {
-            // 'unsafe-eval' is required: lib/json-parser.ts evaluates pasted
-            // JS-object-literal JSON via `new Function()` as a tolerant-parse fallback.
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), payment=()",
+          },
+          {
+            // lib/json-parser.ts used to need 'unsafe-eval' for its
+            // tolerant-parse fallback (new Function() on pasted text) — it's
+            // now a hand-rolled parser instead, so no eval grant is needed.
             // The googletagmanager/google-analytics hosts are for the GA4 tag in
             // app/layout.tsx — GA loads its script from googletagmanager, beacons
             // to google-analytics/analytics.google.com, and falls back to an image
             // pixel, so it needs script-src, connect-src, and img-src entries.
             // Drop these three if the GA tag is ever removed.
+            // style-src still needs 'unsafe-inline': the theme system sets
+            // colors via per-element `style={{...}}` throughout the app, and
+            // CSP has no nonce mechanism for inline style *attributes* (only
+            // for <style> blocks) — removing it would need a full rewrite of
+            // theming to CSS custom properties, out of scope here.
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://va.vercel-scripts.com",
+              "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://va.vercel-scripts.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com",
               "font-src 'self' data:",

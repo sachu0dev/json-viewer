@@ -46,7 +46,7 @@ export const CONVERTERS: Record<string, Omit<ConverterConfig, "convertFn"> & { l
     slug: "json-to-typescript",
     targetName: "TypeScript",
     category: "code",
-    title: "JSON to TypeScript Converter — Interfaces & Type Generator | Devure JSON",
+    title: "JSON to TypeScript Converter — Interfaces & Type Generator",
     description: "Convert JSON to clean, strongly-typed TypeScript interfaces and type definitions instantly. 100% browser-based and local-first.",
     fileExtension: ".ts",
     sampleJson: DEFAULT_SAMPLE_JSON,

@@ -9,15 +9,235 @@ export interface TolerantParseResult {
   jsEvalStatus: "success" | "fails";
 }
 
+// Hand-rolled recursive-descent parser for JS-object-literal syntax (unquoted
+// keys, single-quoted strings, trailing commas) that a strict JSON.parse
+// rejects but a human pasting from a JS console/log would produce. This used
+// to be `new Function(...)(...)`, which works but means CSP has to grant
+// 'unsafe-eval' to the whole page just for this one tolerant-paste fallback,
+// and it happily executes arbitrary pasted JavaScript, not just object
+// literals. This parser accepts exactly the same class of input (objects,
+// arrays, strings, numbers, booleans, null/undefined/NaN/Infinity) without
+// evaluating anything.
+class JsLiteralSyntaxError extends Error {}
+
+function parseJsObjectLiteral(source: string): JsonValue {
+  let i = 0;
+  const len = source.length;
+
+  function skipTrivia() {
+    while (i < len) {
+      const c = source[i];
+      if (c === " " || c === "\t" || c === "\n" || c === "\r") {
+        i++;
+      } else if (c === "/" && source[i + 1] === "/") {
+        i += 2;
+        while (i < len && source[i] !== "\n") i++;
+      } else if (c === "/" && source[i + 1] === "*") {
+        i += 2;
+        while (i < len && !(source[i] === "*" && source[i + 1] === "/")) i++;
+        i += 2;
+      } else {
+        break;
+      }
+    }
+  }
+
+  function fail(message: string): never {
+    throw new JsLiteralSyntaxError(`${message} at position ${i}`);
+  }
+
+  function matchKeyword(word: string): boolean {
+    if (!source.startsWith(word, i)) return false;
+    const next = source[i + word.length];
+    if (next !== undefined && /[A-Za-z0-9_$]/.test(next)) return false;
+    i += word.length;
+    return true;
+  }
+
+  function parseString(quote: string): string {
+    i++; // opening quote
+    let result = "";
+    while (i < len) {
+      const c = source[i];
+      if (c === quote) {
+        i++;
+        return result;
+      }
+      if (c === "\\") {
+        const esc = source[i + 1];
+        switch (esc) {
+          case '"':
+          case "'":
+          case "\\":
+          case "/":
+            result += esc;
+            i += 2;
+            break;
+          case "n":
+            result += "\n";
+            i += 2;
+            break;
+          case "t":
+            result += "\t";
+            i += 2;
+            break;
+          case "r":
+            result += "\r";
+            i += 2;
+            break;
+          case "b":
+            result += "\b";
+            i += 2;
+            break;
+          case "f":
+            result += "\f";
+            i += 2;
+            break;
+          case "u": {
+            const hex = source.slice(i + 2, i + 6);
+            result += String.fromCharCode(parseInt(hex, 16));
+            i += 6;
+            break;
+          }
+          default:
+            result += esc ?? "";
+            i += 2;
+        }
+        continue;
+      }
+      result += c;
+      i++;
+    }
+    fail("Unterminated string");
+  }
+
+  function parseNumber(): number {
+    const start = i;
+    if (source[i] === "+" || source[i] === "-") i++;
+    while (i < len && source[i] >= "0" && source[i] <= "9") i++;
+    if (source[i] === ".") {
+      i++;
+      while (i < len && source[i] >= "0" && source[i] <= "9") i++;
+    }
+    if (source[i] === "e" || source[i] === "E") {
+      i++;
+      if (source[i] === "+" || source[i] === "-") i++;
+      while (i < len && source[i] >= "0" && source[i] <= "9") i++;
+    }
+    const num = Number(source.slice(start, i));
+    if (Number.isNaN(num)) fail("Invalid number");
+    return num;
+  }
+
+  function parseKey(): string {
+    const c = source[i];
+    if (c === '"' || c === "'") return parseString(c);
+    const start = i;
+    while (i < len && source[i] !== ":" && !/\s/.test(source[i])) i++;
+    if (i === start) fail("Expected object key");
+    return source.slice(start, i);
+  }
+
+  function parseArray(): JsonValue[] {
+    i++; // [
+    const arr: JsonValue[] = [];
+    skipTrivia();
+    if (source[i] === "]") {
+      i++;
+      return arr;
+    }
+    for (;;) {
+      arr.push(parseValue());
+      skipTrivia();
+      if (source[i] === ",") {
+        i++;
+        skipTrivia();
+        if (source[i] === "]") {
+          i++;
+          break;
+        }
+        continue;
+      }
+      if (source[i] === "]") {
+        i++;
+        break;
+      }
+      fail("Expected ',' or ']'");
+    }
+    return arr;
+  }
+
+  function parseObject(): Record<string, JsonValue> {
+    i++; // {
+    const obj: Record<string, JsonValue> = {};
+    skipTrivia();
+    if (source[i] === "}") {
+      i++;
+      return obj;
+    }
+    for (;;) {
+      skipTrivia();
+      const key = parseKey();
+      skipTrivia();
+      if (source[i] !== ":") fail("Expected ':'");
+      i++;
+      obj[key] = parseValue();
+      skipTrivia();
+      if (source[i] === ",") {
+        i++;
+        skipTrivia();
+        if (source[i] === "}") {
+          i++;
+          break;
+        }
+        continue;
+      }
+      if (source[i] === "}") {
+        i++;
+        break;
+      }
+      fail("Expected ',' or '}'");
+    }
+    return obj;
+  }
+
+  function parseValue(): JsonValue {
+    skipTrivia();
+    const c = source[i];
+    if (c === undefined) fail("Unexpected end of input");
+    if (c === "{") return parseObject();
+    if (c === "[") return parseArray();
+    if (c === '"' || c === "'") return parseString(c);
+    if (c === "-" || c === "+") {
+      if (source.startsWith("Infinity", i + 1)) {
+        i += 1 + "Infinity".length;
+        return null; // matches JSON.stringify(±Infinity) === "null"
+      }
+      return parseNumber();
+    }
+    if ((c >= "0" && c <= "9") || c === ".") return parseNumber();
+    if (matchKeyword("true")) return true;
+    if (matchKeyword("false")) return false;
+    if (matchKeyword("null")) return null;
+    if (matchKeyword("undefined")) return null; // JSON.stringify(undefined) has no valid JSON form; null is the closest fit
+    if (matchKeyword("NaN")) return null; // matches JSON.stringify(NaN) === "null"
+    if (matchKeyword("Infinity")) return null;
+    fail(`Unexpected token '${c}'`);
+  }
+
+  const value = parseValue();
+  skipTrivia();
+  if (i !== len) fail("Unexpected trailing content");
+  return value;
+}
+
 function evaluateJSObject(text: string): JsonValue | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
   if (!/^[({[\s"'-0-9tfn]/i.test(trimmed)) return null;
 
   try {
-    const fn = new Function(`"use strict"; return (${trimmed});`);
-    const val = fn();
-    return JSON.parse(JSON.stringify(val)) as JsonValue;
+    return parseJsObjectLiteral(trimmed);
   } catch {
     return null;
   }

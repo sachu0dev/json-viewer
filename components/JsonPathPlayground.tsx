@@ -7,6 +7,7 @@ import { listQueryHistory, recordQuery, clearQueryHistory } from "@/lib/jsonpath
 import type { JsonValue } from "@/lib/json-document";
 import { useTheme } from "@/hooks/useTheme";
 import { ToolShell } from "./ToolShell";
+import { ToolIntro } from "./ToolIntro";
 import { JsonEditorArea } from "./JsonEditorArea";
 import { useDialog } from "./DialogProvider";
 
@@ -135,7 +136,15 @@ export function JsonPathPlayground({ initialJson }: Props) {
         }
       }}
     >
-      <div className="flex h-full flex-col lg:flex-row min-h-0">
+      <div className="flex h-full flex-col">
+        <ToolIntro heading="JSONPath Tester" active={Boolean(jsonText.trim())}>
+          Run JSONPath expressions against your JSON and see every matching path and value
+          highlighted instantly as you type. Comes with a quick reference for common syntax
+          (<span className="font-mono">$..</span>, <span className="font-mono">[*]</span>,
+          slices, filters), example queries you can load with one click, and a history of what
+          you&apos;ve tried. Runs entirely client-side — nothing you paste is ever sent anywhere.
+        </ToolIntro>
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* ── Left: JSON input ── */}
         <div className="flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r lg:w-1/2" style={{ borderColor: theme.colors.border }}>
           <div
@@ -330,6 +339,7 @@ export function JsonPathPlayground({ initialJson }: Props) {
             )}
           </div>
         </div>
+      </div>
       </div>
     </ToolShell>
   );

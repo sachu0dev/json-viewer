@@ -5,6 +5,7 @@ import { parseJwt, type DecodedJwt } from "@/lib/jwt";
 import { encodeShareFragment } from "@/lib/share";
 import { useTheme } from "@/hooks/useTheme";
 import { ToolShell } from "./ToolShell";
+import { ToolIntro } from "./ToolIntro";
 
 // Sample JWT tokens for instant quick testing
 function makeSampleJwt(expOffsetSeconds: number, sub: string, role: string, nbfOffsetSeconds?: number): string {
@@ -90,7 +91,16 @@ export function JwtDecoderPlayground() {
         }
       }}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 h-full min-h-0 overflow-hidden">
+      <div className="flex h-full flex-col">
+        <ToolIntro heading="JWT Decoder" active={!isEmpty}>
+          Decode a JSON Web Token&apos;s header and payload instantly — every standard claim
+          (sub, iss, aud, iat, nbf, exp) labeled and explained, plus an independent expiry and
+          not-before check so you don&apos;t have to do unix-timestamp math by hand. This tool
+          decodes only: it never verifies the signature, since that needs the signing key, which
+          this tool never asks for. Decoded entirely in your browser — the token text never
+          touches a network.
+        </ToolIntro>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 min-h-0 flex-1 overflow-hidden">
         {/* Left Column: Token Input Area - 5 Columns */}
         <div
           className="lg:col-span-5 flex flex-col border-b lg:border-b-0 lg:border-r min-h-0"
@@ -371,6 +381,7 @@ export function JwtDecoderPlayground() {
             </>
           )}
         </div>
+      </div>
       </div>
     </ToolShell>
   );

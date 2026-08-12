@@ -126,9 +126,12 @@ export function ToolShell({
             JSON VIEWER
           </Link>
           <span className="text-xs opacity-40">/</span>
-          <h1 className="font-mono text-xs font-semibold m-0" style={{ color: theme.colors.fg }}>
+          {/* Not an h1: the page's real h1 now lives in the ToolIntro block
+              below (so there's exactly one per page for SEO); this is just
+              a compact wayfinding label in the persistent nav bar. */}
+          <span className="font-mono text-xs font-semibold" style={{ color: theme.colors.fg }}>
             {title}
-          </h1>
+          </span>
           {presetSlot}
         </div>
 
@@ -137,6 +140,7 @@ export function ToolShell({
             <Link
               key={link.href}
               href={link.href}
+              prefetch={false}
               className="hover:opacity-80 hover:underline"
               style={link.href === activeHref ? { color: theme.colors.accent, fontWeight: 700 } : undefined}
               aria-current={link.href === activeHref ? "page" : undefined}
@@ -177,7 +181,7 @@ export function ToolShell({
           <select
             value={theme.id}
             onChange={(e) => setThemeId(e.target.value)}
-            className="cursor-pointer bg-transparent px-2 py-0.5 text-xs outline-none transition-colors border rounded"
+            className="max-w-[90px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap border rounded bg-transparent px-2 py-0.5 text-xs outline-none transition-colors sm:max-w-none"
             style={{ borderColor: theme.colors.border, color: theme.colors.muted }}
             aria-label="Select theme"
           >

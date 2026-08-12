@@ -7,6 +7,18 @@ import "./globals.css";
 
 const GA_MEASUREMENT_ID = "G-FSD6QCXQDR";
 
+const websiteStructuredData = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Devure JSON",
+  url: "https://json.devure.in/",
+  publisher: {
+    "@type": "Person",
+    name: "Sushil Kumar",
+    url: "https://devure.in",
+  },
+};
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -68,7 +80,14 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <link rel="preconnect" href="https://www.googletagmanager.com" />
+      </head>
       <body className="min-h-full flex flex-col">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteStructuredData) }}
+        />
         {children}
         <Analytics />
         <SpeedInsights />

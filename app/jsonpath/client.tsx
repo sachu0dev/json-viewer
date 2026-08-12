@@ -7,32 +7,27 @@ import { ThemeProvider } from "@/hooks/useTheme";
 
 function JsonPathPageInner() {
   const [initialJson, setInitialJson] = useState<string | undefined>(undefined);
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let active = true;
     const hash = window.location.hash.slice(1);
-    if (hash) {
-      decodeShareFragment(hash)
-        .then((decoded) => {
-          if (active && decoded) setInitialJson(decoded);
-        })
-        .catch(() => {});
-    }
-    const t = setTimeout(() => {
-      if (active) setReady(true);
-    }, 0);
+    if (!hash) return;
+    decodeShareFragment(hash)
+      .then((decoded) => {
+        if (active && decoded) setInitialJson(decoded);
+      })
+      .catch(() => {});
     return () => {
       active = false;
-      clearTimeout(t);
     };
   }, []);
 
-  if (!ready) {
-    return <div className="p-8 text-sm opacity-40">Loading…</div>;
-  }
-
-  return <JsonPathPlayground initialJson={initialJson} />;
+  // Remounts (via key) once a shared-hash JSON payload decodes, since
+  // JsonPathPlayground only reads initialJson on mount. Rendering
+  // immediately (instead of gating on a "ready" flag) is what lets this
+  // page SSR real content — search/AI crawlers were previously seeing a
+  // bare "Loading…" shell with zero indexable text.
+  return <JsonPathPlayground key={initialJson ?? "default"} initialJson={initialJson} />;
 }
 
 export function JsonPathPageClient() {

@@ -71,6 +71,7 @@ function ToolPageInner({ heading, children, seoContent }: { heading: string; chi
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-mono font-semibold transition-all hover:scale-105"
                   style={{ backgroundColor: theme.colors.active, borderColor: theme.colors.accent, color: theme.colors.accent }}
                 >
@@ -97,6 +98,7 @@ function ToolPageInner({ heading, children, seoContent }: { heading: string; chi
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 className="group flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-mono font-medium transition-all hover:scale-105"
                 style={{
                   backgroundColor: theme.colors.panel,

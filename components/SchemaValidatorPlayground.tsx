@@ -11,6 +11,7 @@ import { listSavedSchemas, saveSchema, deleteSchema, type SavedSchema } from "@/
 import { decodeShareFragment } from "@/lib/share";
 import { useTheme } from "@/hooks/useTheme";
 import { ToolShell } from "./ToolShell";
+import { ToolIntro } from "./ToolIntro";
 import { JsonEditorArea } from "./JsonEditorArea";
 import { useDialog } from "./DialogProvider";
 
@@ -262,6 +263,14 @@ export function SchemaValidatorPlayground() {
       }}
     >
       <div className="flex h-full flex-col">
+        <ToolIntro heading="JSON Schema Validator" active={!isEmpty}>
+          Validate JSON against a JSON Schema — Draft-07, 2019-09, or 2020-12, auto-detected from
+          your schema&apos;s <span className="font-mono">$schema</span> field. Paste data and a
+          schema (or infer one from sample JSON with one click) and get every error explained in
+          plain language with the exact path to the failing field, not a raw Ajv dump. Save
+          schemas you use often, and there&apos;s a built-in regex tester for pattern fields. All
+          validation runs in your browser — nothing is ever uploaded.
+        </ToolIntro>
         {/* Toolbar: draft selector, infer, save/load schema, regex tester */}
         <div
           className="flex flex-wrap items-center gap-2 border-b px-3 py-1.5 text-xs"

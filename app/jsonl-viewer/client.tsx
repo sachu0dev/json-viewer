@@ -13,6 +13,9 @@ const SAMPLE_JSONL = `{"id": 1, "user": "Alice", "status": "active"}
 export function JsonlPageClient() {
   const [inputText, setInputText] = useState(SAMPLE_JSONL);
   const [summary, setSummary] = useState<JsonlSummary | null>(() => parseJsonl(SAMPLE_JSONL));
+  // Starts pre-filled with a sample (unlike the other tools), so the intro
+  // collapses on first focus of the input, not on "has content".
+  const [active, setActive] = useState(false);
 
   function handleProcess() {
     setSummary(parseJsonl(inputText));
@@ -45,13 +48,30 @@ export function JsonlPageClient() {
         </nav>
       </header>
 
-      {/* Hero */}
-      <div className="border-b px-4 py-5" style={{ borderColor: "rgba(255,255,255,0.08)", backgroundColor: "#161b22" }}>
-        <h1 className="text-lg font-semibold">JSONL / NDJSON Viewer & Validator</h1>
-        <p className="mt-0.5 text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
-          Validate line-by-line JSON Lines, filter valid/invalid records, and export.{" "}
-          <span style={{ color: "rgba(255,255,255,0.35)" }}>🔒 100% Local-first processing.</span>
-        </p>
+      {/* Hero — collapses once the user starts editing the input, same
+          collapse-to-fullscreen behavior every other tool page has. */}
+      <div
+        className="overflow-hidden border-b transition-[max-height] duration-200 ease-out motion-reduce:transition-none"
+        style={{
+          borderColor: "rgba(255,255,255,0.08)",
+          backgroundColor: "#161b22",
+          maxHeight: active ? "0px" : "220px",
+        }}
+      >
+        <div className="px-4 py-5">
+          <h1 className="text-lg font-semibold">JSONL / NDJSON Viewer & Validator</h1>
+          <p className="mt-1.5 text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
+            Paste newline-delimited JSON — one JSON value per line, the format used by log
+            streams, ML training exports, and bulk API dumps — and see every line validated
+            independently, with per-line error messages for anything malformed. Filter to
+            valid-only or invalid-only, search across raw text, and export either the clean
+            subset or everything back out as .jsonl. Virtualized rendering stays smooth even
+            past 100,000 records.{" "}
+            <span style={{ color: "rgba(255,255,255,0.35)" }}>
+              🔒 100% local-first — nothing you paste ever leaves your browser.
+            </span>
+          </p>
+        </div>
       </div>
 
       {/* Content */}
@@ -77,6 +97,7 @@ export function JsonlPageClient() {
               setInputText(e.target.value);
               setSummary(parseJsonl(e.target.value));
             }}
+            onFocus={() => setActive(true)}
             placeholder="Paste JSONL here (one JSON value per line)…"
             className="flex-1 rounded-lg p-3 font-mono text-xs leading-relaxed outline-none resize-none min-h-[300px]"
             style={{

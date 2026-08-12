@@ -6,6 +6,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { CONVERTERS, CONVERTER_SLUGS, executeConverter } from "@/lib/converters/registry";
 import { tokenizeCode } from "@/lib/code-highlighter";
 import { ToolShell } from "./ToolShell";
+import { ToolIntro } from "./ToolIntro";
 
 interface Props {
   slug: string;
@@ -30,6 +31,11 @@ export function ConverterPlayground({ slug, initialHashText }: Props) {
     return initial;
   });
   const [toast, setToast] = useState<string | null>(null);
+  // Converters pre-fill a sample on load (unlike the other tools, which
+  // start empty), so "has content" can't be the collapse trigger — it'd
+  // collapse the intro before the user does anything. Collapse on first
+  // genuine interaction with the editor instead.
+  const [active, setActive] = useState(false);
 
   // Sync options when slug changes
   const [prevSlug, setPrevSlug] = useState(slug);
@@ -149,8 +155,13 @@ export function ConverterPlayground({ slug, initialHashText }: Props) {
   );
 
   return (
-    <ToolShell title="Converters" activeHref={`/${slug}`} presetSlot={presetSlot} commands={commands} onSelectCommand={handleSelectCommand}>
+    <ToolShell title={`JSON to ${config.targetName}`} activeHref={`/${slug}`} presetSlot={presetSlot} commands={commands} onSelectCommand={handleSelectCommand}>
       <div className="flex h-full flex-col font-mono text-sm">
+        <ToolIntro heading={`JSON to ${config.targetName}`} active={active}>
+          {config.description} Paste or drop JSON on the left and watch the {config.targetName}{" "}
+          output update live on the right — copy it or download the file directly. Runs entirely
+          in your browser; nothing you paste is ever uploaded.
+        </ToolIntro>
         {/* ── Dynamic Options Bar ── */}
         {config.options.length > 0 && (
           <div
@@ -227,6 +238,7 @@ export function ConverterPlayground({ slug, initialHashText }: Props) {
               id="converter-json-input"
               value={jsonText}
               onChange={(e) => setJsonText(e.target.value)}
+              onFocus={() => setActive(true)}
               placeholder="Paste JSON here…"
               aria-label="JSON input to convert"
               className="flex-1 w-full p-4 font-mono text-xs leading-relaxed outline-none resize-none"
