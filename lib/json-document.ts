@@ -442,3 +442,115 @@ export function stringifyWithOptions(doc: JsonValue, opts: FormatOptions): strin
   const text = JSON.stringify(doc, replacer as (key: string, value: unknown) => unknown, indentArg);
   return opts.trailingNewline ? text + "\n" : text;
 }
+
+// ─── Path Manipulation & Tree Editing ───────────────────────────────────────
+
+export function parsePathSegments(path: string): (string | number)[] {
+  if (!path || path === "$") return [];
+  const segments: (string | number)[] = [];
+  const pattern = /\.([^.[\]]+)|\[(\d+)\]/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(path)) !== null) {
+    if (match[1] !== undefined) {
+      segments.push(match[1]);
+    } else if (match[2] !== undefined) {
+      segments.push(parseInt(match[2], 10));
+    }
+  }
+  return segments;
+}
+
+function parseRawValue(raw: string): JsonValue {
+  const trimmed = raw.trim();
+  if (trimmed === "true") return true;
+  if (trimmed === "false") return false;
+  if (trimmed === "null") return null;
+  if (trimmed === "") return "";
+  if (!isNaN(Number(trimmed)) && !trimmed.startsWith("0x")) return Number(trimmed);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // Treat as literal string if not valid JSON
+    if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+      return raw.slice(1, -1);
+    }
+    return raw;
+  }
+}
+
+function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+export function updateNodeValueAtPath(root: JsonValue, path: string, newValueRaw: string): JsonValue {
+  const segments = parsePathSegments(path);
+  if (segments.length === 0) return parseRawValue(newValueRaw);
+
+  const cloned = deepClone(root);
+  let current: any = cloned;
+  for (let i = 0; i < segments.length - 1; i++) {
+    current = current[segments[i]];
+    if (current === undefined || current === null) return root;
+  }
+
+  const lastKey = segments[segments.length - 1];
+  current[lastKey] = parseRawValue(newValueRaw);
+  return cloned;
+}
+
+export function renameNodeKeyAtPath(root: JsonValue, path: string, newKeyName: string): JsonValue {
+  const trimmedKey = newKeyName.trim();
+  if (!trimmedKey) return root;
+
+  const segments = parsePathSegments(path);
+  if (segments.length === 0) return root;
+
+  const cloned = deepClone(root);
+  let current: any = cloned;
+  for (let i = 0; i < segments.length - 1; i++) {
+    current = current[segments[i]];
+    if (current === undefined || current === null) return root;
+  }
+
+  const oldKey = segments[segments.length - 1];
+  if (typeof oldKey === "number" || typeof current !== "object" || Array.isArray(current)) return root;
+
+  if (oldKey === trimmedKey) return root;
+
+  // Re-build object to preserve key ordering
+  const updated: Record<string, JsonValue> = {};
+  for (const k of Object.keys(current)) {
+    if (k === oldKey) {
+      updated[trimmedKey] = current[oldKey];
+    } else {
+      updated[k] = current[k];
+    }
+  }
+
+  // Swap contents of parent container
+  for (const k of Object.keys(current)) delete current[k];
+  Object.assign(current, updated);
+
+  return cloned;
+}
+
+export function deleteNodeAtPath(root: JsonValue, path: string): JsonValue {
+  const segments = parsePathSegments(path);
+  if (segments.length === 0) return null;
+
+  const cloned = deepClone(root);
+  let current: any = cloned;
+  for (let i = 0; i < segments.length - 1; i++) {
+    current = current[segments[i]];
+    if (current === undefined || current === null) return root;
+  }
+
+  const lastKey = segments[segments.length - 1];
+  if (Array.isArray(current) && typeof lastKey === "number") {
+    current.splice(lastKey, 1);
+  } else if (typeof current === "object" && current !== null && typeof lastKey === "string") {
+    delete current[lastKey];
+  }
+
+  return cloned;
+}

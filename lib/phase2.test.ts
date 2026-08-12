@@ -51,3 +51,27 @@ test("isJsonlContent & parseJsonl detect and validate line-delimited records", (
   assert.equal(summary.records[0].isValid, true);
   assert.equal(summary.records[2].isValid, false);
 });
+
+test("path editing functions mutate document structures cleanly", async () => {
+  const { updateNodeValueAtPath, renameNodeKeyAtPath, deleteNodeAtPath } = await import("./json-document.ts");
+  const doc = {
+    users: [
+      { id: 1, name: "Alice" },
+      { id: 2, name: "Bob" },
+    ],
+    settings: { theme: "dark" },
+  };
+
+  // Update value
+  const doc1 = updateNodeValueAtPath(doc, "$.users[0].name", "Alice Wonder") as any;
+  assert.equal(doc1.users[0].name, "Alice Wonder");
+
+  // Rename key
+  const doc2 = renameNodeKeyAtPath(doc, "$.settings.theme", "themeId") as any;
+  assert.equal(doc2.settings.themeId, "dark");
+  assert.equal(doc2.settings.theme, undefined);
+
+  // Delete node
+  const doc3 = deleteNodeAtPath(doc, "$.users[1]") as any;
+  assert.equal(doc3.users.length, 1);
+});

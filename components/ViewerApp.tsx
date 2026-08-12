@@ -16,7 +16,8 @@ import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { decodeLegacyGzipFragment, decodeShareFragment, encodeShareFragment } from "@/lib/share";
 import { track, type LoadSource } from "@/lib/analytics";
 import { PORTFOLIO_URL, GITHUB_URL, TWITTER_URL, LINKEDIN_URL } from "@/lib/site";
-import { DEFAULT_FORMAT_OPTIONS, type FormatOptions } from "@/lib/json-document";
+import { DEFAULT_FORMAT_OPTIONS, type FormatOptions, updateNodeValueAtPath, renameNodeKeyAtPath, deleteNodeAtPath, stringifyWithOptions } from "@/lib/json-document";
+import { parseTolerantJSON } from "@/lib/json-parser";
 import { SettingsModal } from "@/components/SettingsModal";
 import { loadSettings, type AppSettings } from "@/lib/settings";
 import { RepairModal } from "@/components/RepairModal";
@@ -484,6 +485,34 @@ export function ViewerAppContent({
     const res = repairJson(rawText);
     setRepairResult(res);
     setRepairModalOpen(true);
+  }
+
+  function handleEditNode(path: string, field: "key" | "value", newValue: string) {
+    try {
+      const parsed = parseTolerantJSON(rawText).value;
+      if (parsed === null) return;
+      const updated = field === "key"
+        ? renameNodeKeyAtPath(parsed, path, newValue)
+        : updateNodeValueAtPath(parsed, path, newValue);
+      const text = stringifyWithOptions(updated, formatOptions);
+      openText(text, "edit");
+      setToast(field === "key" ? "Renamed key" : "Updated value");
+    } catch {
+      setToast("Failed to edit node");
+    }
+  }
+
+  function handleDeleteNode(path: string) {
+    try {
+      const parsed = parseTolerantJSON(rawText).value;
+      if (parsed === null) return;
+      const updated = deleteNodeAtPath(parsed, path);
+      const text = stringifyWithOptions(updated, formatOptions);
+      openText(text, "edit");
+      setToast("Deleted node");
+    } catch {
+      setToast("Failed to delete node");
+    }
   }
 
   function handleSelectCommand(commandId: string) {
@@ -1184,6 +1213,8 @@ export function ViewerAppContent({
                   revealTarget={revealTarget}
                   searchQuery={searchQuery}
                   onToast={setToast}
+                  onEditNode={handleEditNode}
+                  onDeleteNode={handleDeleteNode}
                 />
               </div>
             </div>
@@ -1208,6 +1239,7 @@ export function ViewerAppContent({
                   revealTarget={revealTarget}
                   searchQuery={searchQuery}
                   onToast={setToast}
+                  readOnly={true}
                 />
               </div>
             </div>
@@ -1218,6 +1250,8 @@ export function ViewerAppContent({
               revealTarget={revealTarget}
               searchQuery={searchQuery}
               onToast={setToast}
+              onEditNode={handleEditNode}
+              onDeleteNode={handleDeleteNode}
             />
           )
         )}
