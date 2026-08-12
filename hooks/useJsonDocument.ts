@@ -38,7 +38,13 @@ export function useJsonDocument() {
         setJsEvalStatus(data.jsEvalStatus);
       } else if (data.type === "error") {
         setIsLoading(false);
-        setRows(null);
+        // Deliberately not clearing rows here: a mid-edit keystroke that's
+        // transiently invalid JSON used to null out rows, which unmounted
+        // the editor pane entirely (rendered only in the `rows &&` branch)
+        // — that was the full-page flicker/scroll-to-top bug. Keep showing
+        // the last successfully parsed tree (stale-while-revalidating)
+        // until the next successful parse replaces it; the status banner
+        // still reflects the current error.
         setError(data.error);
         setParseMode("error");
         setStringParseError(data.error);

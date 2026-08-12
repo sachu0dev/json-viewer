@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CommandPalette, type Command } from "@/components/CommandPalette";
 import { EmptyState } from "@/components/EmptyState";
 import { JsonEditorArea } from "@/components/JsonEditorArea";
@@ -23,7 +23,13 @@ function tryAutoFormat(text: string): string {
   }
 }
 
-function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolean) => void }) {
+export function ViewerAppContent({
+  onActiveChange,
+  headerSlot,
+}: {
+  onActiveChange?: (active: boolean) => void;
+  headerSlot?: ReactNode;
+}) {
   const {
     rows,
     error,
@@ -71,6 +77,24 @@ function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolea
   }, [rows, isLoading, error, record]);
 
   const currentTextRef = useRef<string | null>(null);
+  const editDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (editDebounceRef.current) clearTimeout(editDebounceRef.current);
+    };
+  }, []);
+
+  // Debounced so a full reparse doesn't run on every keystroke — instant
+  // loads (paste/drop/open/recent-file) call loadText directly and skip this.
+  const handleEditorChange = useCallback(
+    (text: string) => {
+      setRawText(text);
+      currentTextRef.current = text;
+      if (editDebounceRef.current) clearTimeout(editDebounceRef.current);
+      editDebounceRef.current = setTimeout(() => loadText(text), 300);
+    },
+    [loadText],
+  );
   const [shareStatus, setShareStatus] = useState<"idle" | "copied" | "error">("idle");
 
   const openText = useCallback(
@@ -376,27 +400,6 @@ function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolea
             </>
           )}
 
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="GitHub — sachu0dev"
-            className="px-1.5 py-1 text-xs transition-colors hover:opacity-80"
-            style={{ color: theme.colors.muted }}
-          >
-            GitHub
-          </a>
-          <a
-            href={PORTFOLIO_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Portfolio — devure.in"
-            className="px-1.5 py-1 text-xs transition-colors hover:opacity-80"
-            style={{ color: theme.colors.muted }}
-          >
-            devure.in
-          </a>
-
           <button
             onClick={() => setPaletteOpen(true)}
             className="rounded px-2.5 py-1 font-mono text-xs font-semibold transition-colors hover:opacity-80"
@@ -409,6 +412,8 @@ function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolea
           </button>
         </div>
       </div>
+
+      {headerSlot}
 
       {/* Parse Status / Error Banner */}
       {(stringParseError || parseMode !== "strict") && (rows || error) && (
@@ -499,13 +504,18 @@ function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolea
           </div>
         )}
 
-        {!error && isLoading && (
+        {!error && isLoading && !rows && (
           <div className="flex h-full w-full items-center justify-center font-mono text-sm" style={{ color: theme.colors.muted }}>
             Parsing document…
           </div>
         )}
 
-        {!error && !isLoading && rows && isComparing && (
+        {/* Once a document has parsed successfully once, keep the editor/tree
+            mounted and showing the last-good rows even if a later keystroke
+            is transiently invalid — only the status banner above reflects
+            the current error. Remounting this on every error was the cause
+            of the flicker/scroll-to-top bug. */}
+        {rows && isComparing && (
           compareError ? (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-8 text-center">
               <p className="font-mono text-sm" style={{ color: theme.colors.diffRemoved }}>
@@ -521,7 +531,7 @@ function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolea
           )
         )}
 
-        {!error && !isLoading && rows && !isComparing && (
+        {rows && !isComparing && (
           viewLayout === "split" ? (
             <div className="flex h-full w-full overflow-hidden">
               {/* Left Pane: Syntax-Highlighted Themed JSON Editor */}
@@ -550,11 +560,7 @@ function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolea
                 <div className="flex-1 overflow-hidden">
                   <JsonEditorArea
                     value={rawText}
-                    onChange={(text) => {
-                      setRawText(text);
-                      currentTextRef.current = text;
-                      loadText(text);
-                    }}
+                    onChange={handleEditorChange}
                     theme={theme}
                     searchQuery={searchQuery}
                   />
@@ -612,10 +618,13 @@ function ViewerAppContent({ onActiveChange }: { onActiveChange?: (active: boolea
   );
 }
 
-export function ViewerApp({ onActiveChange }: { onActiveChange?: (active: boolean) => void } = {}) {
+export function ViewerApp({
+  onActiveChange,
+  headerSlot,
+}: { onActiveChange?: (active: boolean) => void; headerSlot?: ReactNode } = {}) {
   return (
     <ThemeProvider>
-      <ViewerAppContent onActiveChange={onActiveChange} />
+      <ViewerAppContent onActiveChange={onActiveChange} headerSlot={headerSlot} />
     </ThemeProvider>
   );
 }
