@@ -173,7 +173,7 @@ export function JsonPathPlayground({ initialJson }: Props) {
               {jsonError && <span className="text-red-400">✕ invalid</span>}
             </span>
           </div>
-          <div className="flex-1 min-h-[200px]">
+          <div className="flex-1 min-h-50">
             <JsonEditorArea
               value={jsonText}
               onChange={setJsonText}
@@ -283,11 +283,11 @@ export function JsonPathPlayground({ initialJson }: Props) {
             )}
 
             {queryResult && !queryResult.error && resultCount > 0 && (
-              <div className="overflow-hidden rounded-lg border" style={{ borderColor: theme.colors.border }}>
+              <div className="divide-y overflow-hidden rounded-lg border" style={{ borderColor: theme.colors.border }}>
                 {queryResult.results.map((r, i) => (
                   <div
                     key={i}
-                    className="flex flex-col gap-0.5 px-3 py-2 text-xs font-mono border-t first:border-t-0"
+                    className="flex flex-col gap-0.5 px-3 py-2 text-xs font-mono"
                     style={{ borderColor: theme.colors.border, backgroundColor: i % 2 === 0 ? theme.colors.bg : theme.colors.panel }}
                   >
                     <div className="flex items-center gap-2">

@@ -865,7 +865,7 @@ export function ViewerAppContent({
               const selected = themes.find((t) => t.id === newThemeId);
               if (selected) setToast(`Theme: ${selected.name}`);
             }}
-            className="max-w-[90px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap bg-transparent px-2 py-1 text-xs outline-none transition-colors sm:max-w-none"
+            className="max-w-22.5 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap bg-transparent px-2 py-1 text-xs outline-none transition-colors sm:max-w-none"
             style={{ color: theme.colors.muted }}
             aria-label="Select theme"
           >

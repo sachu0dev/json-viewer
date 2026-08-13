@@ -110,7 +110,7 @@ function ToolPageInner({ heading, children, seoContent }: { heading: string; chi
                 {item.label}
                 <button
                   onClick={(e) => handleTogglePin(e, item.href)}
-                  className="opacity-0 transition-opacity group-hover:opacity-70 hover:!opacity-100"
+                  className="opacity-0 transition-opacity group-hover:opacity-70 hover:opacity-100!"
                   style={{ color: isPinned ? theme.colors.accent : theme.colors.muted }}
                   aria-label={isPinned ? `Unpin ${item.label}` : `Pin ${item.label} for quick access`}
                   title={isPinned ? "Unpin" : "Pin for quick access"}
