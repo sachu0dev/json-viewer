@@ -6,7 +6,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const currentDate = new Date().toISOString();
 
   const coreRoutes = [
-    { route: "", priority: 1.0, changeFrequency: "daily" as const },
+    { route: "/", priority: 1.0, changeFrequency: "daily" as const },
     { route: "/json-diff", priority: 0.9, changeFrequency: "weekly" as const },
     { route: "/large-files", priority: 0.9, changeFrequency: "weekly" as const },
     { route: "/jsonpath", priority: 0.9, changeFrequency: "weekly" as const },
