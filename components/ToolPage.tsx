@@ -30,7 +30,17 @@ export const FEATURE_LINKS = [
   { label: "SQL", href: "/json-to-sql", icon: "🗄️" },
 ];
 
-function ToolPageInner({ heading, children, seoContent }: { heading: string; children: ReactNode; seoContent?: ReactNode }) {
+function ToolPageInner({
+  heading,
+  children,
+  seoContent,
+  diffMode,
+}: {
+  heading: string;
+  children: ReactNode;
+  seoContent?: ReactNode;
+  diffMode?: boolean;
+}) {
   const [active, setActive] = useState(false);
   const { theme } = useTheme();
   const [pinned, setPinned] = useState<string[]>([]);
@@ -137,7 +147,7 @@ function ToolPageInner({ heading, children, seoContent }: { heading: string; chi
       style={{ backgroundColor: theme.colors.bg, color: theme.colors.fg }}
     >
       <div className={seoContent ? "h-dvh w-full shrink-0" : "min-h-0 flex-1"}>
-        <ViewerAppContent onActiveChange={setActive} headerSlot={introSlot} />
+        <ViewerAppContent onActiveChange={setActive} headerSlot={introSlot} diffMode={diffMode} />
       </div>
 
       {seoContent}
@@ -168,10 +178,20 @@ function ToolPageInner({ heading, children, seoContent }: { heading: string; chi
   );
 }
 
-export function ToolPage({ heading, children, seoContent }: { heading: string; children: ReactNode; seoContent?: ReactNode }) {
+export function ToolPage({
+  heading,
+  children,
+  seoContent,
+  diffMode,
+}: {
+  heading: string;
+  children: ReactNode;
+  seoContent?: ReactNode;
+  diffMode?: boolean;
+}) {
   return (
     <ThemeProvider>
-      <ToolPageInner heading={heading} seoContent={seoContent}>
+      <ToolPageInner heading={heading} seoContent={seoContent} diffMode={diffMode}>
         {children}
       </ToolPageInner>
     </ThemeProvider>

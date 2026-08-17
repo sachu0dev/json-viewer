@@ -25,6 +25,7 @@ export function useJsonDocument() {
   const stringifyResolverRef = useRef<((text: string) => void) | null>(null);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSearchRef = useRef<{ query: string; opts?: SearchOptions } | null>(null);
 
   useEffect(() => {
     const worker = new Worker(new URL("../workers/json.worker.ts", import.meta.url));
@@ -37,6 +38,16 @@ export function useJsonDocument() {
         setParseMode(data.mode);
         setStringParseError(data.stringError);
         setJsEvalStatus(data.jsEvalStatus);
+        // Reformatting/editing reparses the document, which would otherwise
+        // leave an active search query stuck at "No results" (see loadText).
+        // Re-run it now that the new rows exist.
+        if (lastSearchRef.current?.query) {
+          worker.postMessage({
+            type: "search",
+            query: lastSearchRef.current.query,
+            opts: lastSearchRef.current.opts,
+          } satisfies WorkerRequest);
+        }
       } else if (data.type === "error") {
         setIsLoading(false);
         // Deliberately not clearing rows here: a mid-edit keystroke that's
@@ -100,6 +111,7 @@ export function useJsonDocument() {
   // Debounced search (150ms delay) to prevent UI lag on rapid typing
   const search = useCallback(
     (query: string, opts?: SearchOptions) => {
+      lastSearchRef.current = { query, opts };
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       searchTimerRef.current = setTimeout(() => {
         send({ type: "search", query, opts });

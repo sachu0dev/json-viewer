@@ -38,9 +38,11 @@ function tryAutoFormat(text: string): string {
 export function ViewerAppContent({
   onActiveChange,
   headerSlot,
+  diffMode,
 }: {
   onActiveChange?: (active: boolean) => void;
   headerSlot?: ReactNode;
+  diffMode?: boolean;
 }) {
   const {
     rows,
@@ -116,6 +118,20 @@ export function ViewerAppContent({
   useEffect(() => {
     isComparingRef.current = isComparing;
   }, [isComparing]);
+
+  // On the dedicated diff page, the empty state only ever shows one paste
+  // target, so "paste the first document, then find the Compare button" is
+  // not discoverable — the button doesn't exist until a document is loaded.
+  // Once the first document lands here, jump straight into compare mode so
+  // the very next screen asks for the second document, with no button to
+  // hunt for.
+  const hasAutoStartedCompareRef = useRef(false);
+  useEffect(() => {
+    if (!diffMode || !rows || hasAutoStartedCompareRef.current) return;
+    hasAutoStartedCompareRef.current = true;
+    setIsComparing(true);
+    track("compare_started");
+  }, [diffMode, rows]);
 
   useEffect(() => {
     onActiveChange?.(Boolean(rows));
@@ -323,6 +339,8 @@ export function ViewerAppContent({
   function exitCompare() {
     setIsComparing(false);
     clearCompare();
+    // Let a fresh document on the diff page auto-prompt for its pair again.
+    hasAutoStartedCompareRef.current = false;
   }
 
   function handleFormatText() {

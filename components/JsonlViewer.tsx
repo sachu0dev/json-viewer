@@ -40,6 +40,10 @@ export function JsonlViewer({ summary, onExitJsonl }: Props) {
     getScrollElement: () => parentRef.current,
     estimateSize: () => 40,
     overscan: 10,
+    // Rows grow taller when an invalid record's error detail is expanded;
+    // without remeasuring, later rows keep the stale 40px offset and get
+    // overlapped by the expanded content instead of pushed down.
+    measureElement: (element) => element.getBoundingClientRect().height,
   });
 
   function toggleExpand(line: number) {
@@ -184,6 +188,8 @@ export function JsonlViewer({ summary, onExitJsonl }: Props) {
               return (
                 <div
                   key={record.lineNumber}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
                   style={{
                     position: "absolute",
                     top: 0,

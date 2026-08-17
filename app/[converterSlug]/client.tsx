@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ConverterPlayground } from "@/components/ConverterPlayground";
-import { decodeShareFragment } from "@/lib/share";
+import { decodeLegacyGzipFragment, decodeShareFragment } from "@/lib/share";
 
 import { ThemeProvider } from "@/hooks/useTheme";
 
@@ -16,10 +16,17 @@ export function ConverterClientPage({ slug }: Props) {
   useEffect(() => {
     async function loadHash() {
       if (typeof window === "undefined") return;
-      const hash = window.location.hash.slice(1);
-      if (!hash) return;
+      const hash = window.location.hash;
+      // `#z=` is the current (deflate-raw) format; `#d=` is the older gzip
+      // one, still decoded so links shared before the switch keep working.
+      const decode = hash.startsWith("#z=")
+        ? decodeShareFragment
+        : hash.startsWith("#d=")
+          ? decodeLegacyGzipFragment
+          : null;
+      if (!decode) return;
       try {
-        const decoded = await decodeShareFragment(hash);
+        const decoded = await decode(hash.slice(3));
         if (decoded) setInitialText(decoded);
       } catch {
         // Hash decode failed, fallback to default sample
@@ -30,7 +37,10 @@ export function ConverterClientPage({ slug }: Props) {
 
   return (
     <ThemeProvider>
-      <ConverterPlayground slug={slug} initialHashText={initialText} />
+      {/* Remounts (via key) once a shared-hash JSON payload decodes, since
+          ConverterPlayground only reads initialHashText on mount — see the
+          same pattern in app/jsonpath/client.tsx. */}
+      <ConverterPlayground key={initialText ?? "default"} slug={slug} initialHashText={initialText} />
     </ThemeProvider>
   );
 }

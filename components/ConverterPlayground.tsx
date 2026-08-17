@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/hooks/useTheme";
 import { track } from "@/lib/analytics";
+import { encodeShareFragment } from "@/lib/share";
 import { CONVERTERS, CONVERTER_SLUGS, executeConverter } from "@/lib/converters/registry";
 import { tokenizeCode } from "@/lib/code-highlighter";
 import { ToolShell } from "./ToolShell";
@@ -101,6 +102,23 @@ export function ConverterPlayground({ slug, initialHashText }: Props) {
     setTimeout(() => setToast(null), 3000);
   }
 
+  // Switching the output target is meant to keep the same input and just
+  // re-render it in a different language — carry jsonText across the
+  // navigation via the same share-fragment hash used for share links,
+  // instead of losing it to the target page's canned sample.
+  async function navigateToTarget(targetSlug: string) {
+    try {
+      const fragment = await encodeShareFragment(jsonText);
+      startTransition(() => {
+        router.push(`/${targetSlug}#z=${fragment}`);
+      });
+    } catch {
+      startTransition(() => {
+        router.push(`/${targetSlug}`);
+      });
+    }
+  }
+
   const commands = [
     { id: "open-editor", label: "← Back to JSON Editor" },
     { id: "load-sample", label: "Load sample JSON" },
@@ -124,7 +142,7 @@ export function ConverterPlayground({ slug, initialHashText }: Props) {
       handleDownload();
     } else if (id.startsWith("nav-")) {
       const target = id.slice(4);
-      router.push(`/${target}`);
+      void navigateToTarget(target);
     }
   }
 
@@ -153,10 +171,7 @@ export function ConverterPlayground({ slug, initialHashText }: Props) {
       <select
         value={slug}
         onChange={(e) => {
-          const targetSlug = e.target.value;
-          startTransition(() => {
-            router.push(`/${targetSlug}`);
-          });
+          void navigateToTarget(e.target.value);
         }}
         className="rounded border px-2 py-1 text-xs font-semibold outline-none cursor-pointer"
         style={{ backgroundColor: theme.colors.bg, color: theme.colors.accent, borderColor: theme.colors.border }}
