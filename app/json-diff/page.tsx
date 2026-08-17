@@ -32,10 +32,10 @@ export default function JsonDiffPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <ToolPage heading="Compare two JSON files">
-        Paste your first JSON below, then use <span className="font-mono">Compare…</span> to
-        paste the second. You get a real structural diff — added, removed, and changed fields —
-        not a line-by-line text diff. Nothing you paste ever leaves your browser.
+      <ToolPage heading="Compare two JSON files" diffMode>
+        Paste your first JSON below — you&apos;ll be prompted for the second one right after. You
+        get a real structural diff — added, removed, and changed fields — not a line-by-line text
+        diff. Nothing you paste ever leaves your browser.
       </ToolPage>
     </>
   );
