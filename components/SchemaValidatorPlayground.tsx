@@ -184,18 +184,20 @@ export function SchemaValidatorPlayground() {
 
   const isPending = dataText !== debouncedData || schemaText !== debouncedSchema;
 
+  // Each line is treated as one candidate value (matching how a schema
+  // "pattern" is tested against a single string), not one blob — so `^`/`$`
+  // anchor per-candidate the way the "one per line" placeholder promises.
   const regexResult = useMemo(() => {
     if (!regexPattern) return null;
+    const lines = regexTestString.split("\n").filter((l) => l.length > 0);
     try {
-      const re = new RegExp(regexPattern, regexFlags);
-      if (regexFlags.includes("g")) {
-        const matches = Array.from(regexTestString.matchAll(re));
-        return { error: null, isMatch: matches.length > 0, matches };
-      }
-      const m = re.exec(regexTestString);
-      return { error: null, isMatch: m !== null, matches: m ? [m] : [] };
+      const lineResults = lines.map((line) => {
+        const re = new RegExp(regexPattern, regexFlags);
+        return { line, matched: re.test(line) };
+      });
+      return { error: null, lineResults };
     } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err), isMatch: false, matches: [] };
+      return { error: err instanceof Error ? err.message : String(err), lineResults: [] };
     }
   }, [regexPattern, regexFlags, regexTestString]);
 
@@ -453,14 +455,18 @@ export function SchemaValidatorPlayground() {
             {regexResult?.error && (
               <p className="mt-1.5 font-mono text-[11px] text-red-400">Invalid pattern: {regexResult.error}</p>
             )}
-            {regexResult && !regexResult.error && (
-              <p className="mt-1.5 font-mono text-[11px]" style={{ color: regexResult.isMatch ? "#10b981" : theme.colors.muted }}>
-                {regexResult.isMatch ? `✓ ${regexResult.matches.length} match(es)` : "✕ no match"}
-                {regexResult.matches.slice(0, 5).map((m, i) => (
-                  <span key={i} className="ml-2 opacity-80">
-                    {`[${m.index}] "${m[0]}"`}
-                  </span>
+            {regexResult && !regexResult.error && regexResult.lineResults.length > 0 && (
+              <div className="mt-1.5 font-mono text-[11px]">
+                {regexResult.lineResults.map((r, i) => (
+                  <div key={i} style={{ color: r.matched ? "#10b981" : "#ef4444" }}>
+                    {r.matched ? "✓" : "✕"} {r.line}
+                  </div>
                 ))}
+              </div>
+            )}
+            {regexResult && !regexResult.error && regexResult.lineResults.length === 0 && (
+              <p className="mt-1.5 font-mono text-[11px]" style={{ color: theme.colors.muted }}>
+                Paste a candidate value above to test it against the pattern.
               </p>
             )}
           </div>
